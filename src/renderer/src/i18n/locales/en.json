@@ -5298,11 +5298,7 @@
           "5c9c7c16aa": "Add a project to create workspaces",
           "a30e34eb5c": "Close workspace board",
           "views": "Sidebar view",
-          "createMenu": "Create",
-          "addProject": "Add project",
-          "25a95899c9": "Add Project",
-          "ca6f729da2": "New workspace ({{value0}})",
-          "moreActions": "More workspace actions"
+          "addProject": "Add project"
         },
         "SidebarNav": {
           "80611a8b10": "Search",
@@ -16268,9 +16264,7 @@
             "permission": "Needs attention"
           },
           "filtersSection": "Filters",
-          "viewSection": "View",
-          "compactModeDescription": "Shows shorter thread rows with one-line titles and two-line status messages.",
-          "unreadOnlyDescription": "Filters the activity list to show only threads with unread updates."
+          "viewSection": "View"
         },
         "clearCompleted": {
           "clearedOne": "Cleared 1 completed agent",
@@ -17260,7 +17254,11 @@
       },
       "forkServerUpdateRequired": "Forking requires a newer Orca server. Update the server and try again.",
       "forkFromTurn": "Fork from this turn",
-      "forkFailed": "Could not fork this turn. Wait for the conversation to finish and try again.",
+      "forkFailed": "Could not fork this turn.",
+      "forkBusy": "Wait for this conversation to finish, then fork the turn.",
+      "forkUnsupported": "This conversation cannot be forked.",
+      "forkHistoryLimit": "This turn carries too much history to fork.",
+      "forkStaleEpoch": "This conversation moved on. Reopen it and fork the turn again.",
       "forkUnconfirmed": "A fork could not be confirmed. Retry the same turn to check its outcome."
     },
     "tab": {

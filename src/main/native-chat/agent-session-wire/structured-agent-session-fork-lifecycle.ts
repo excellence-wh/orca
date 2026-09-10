@@ -1,5 +1,10 @@
+import { isDeepStrictEqual } from 'node:util'
 import { agentSessionForkAnchor } from '../../../shared/agent-session-fork'
-import type { AgentSessionForkTarget } from '../../../shared/agent-session-fork'
+import type {
+  AgentSessionForkRecord,
+  AgentSessionForkTarget
+} from '../../../shared/agent-session-fork'
+import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
 import { isAdmissibleAgentJournalItemBody } from '../../../shared/agent-session-journal-schemas'
 import {
   agentSessionProviderHandleKey,
@@ -37,6 +42,56 @@ export async function beginStructuredForkAttempt(
     throughId: fork.throughId,
     retainedItemIds: fork.retained.map((item) => item.itemId)
   }
+}
+
+/**
+ * Settle an attempt that provably never reached the provider.
+ *
+ * Without a terminal for this case the record stays `attempted` forever: every later attach throws
+ * `agent_session_operation_unknown` and replay deliberately skips the phase, so the child is
+ * wedged. Clearing `retained` matters just as much — the store re-serializes in full on every
+ * lease renewal, so a stranded prefix is rewritten every few seconds for the life of the record.
+ *
+ * Only a proven pre-provider failure may settle here. An ambiguous one must keep `attempted` and
+ * refuse a second attempt rather than risk a second provider session.
+ */
+export async function refuseStructuredForkAttempt(
+  store: AgentSessionRecordStore,
+  record: AgentSessionRecord,
+  reason: string
+): Promise<void> {
+  const fork = store.getRecord(record.sessionId)?.fork
+  if (fork?.phase !== 'attempted') {
+    return
+  }
+  await store.transitionHandoff(record.sessionId, (current) => {
+    if (
+      current.lease.runtimeFence !== record.lease.runtimeFence ||
+      current.fork?.phase !== 'attempted'
+    ) {
+      throw new Error('agent_session_checkpoint_stale')
+    }
+    return {
+      ...current,
+      fork: { ...current.fork, phase: 'refused', reason: reason.slice(0, 512), retained: [] }
+    }
+  })
+}
+
+/** Re-arm a refused fork. The retry re-derives the prefix from the parent, because settling the
+ *  refusal dropped the stranded copy. */
+export function restartRefusedStructuredFork(
+  store: AgentSessionRecordStore,
+  sessionId: string,
+  fork: AgentSessionForkRecord
+): Promise<unknown> {
+  return store.transitionHandoff(sessionId, (current) => {
+    if (current.fork?.phase !== 'refused') {
+      throw new Error('agent_session_checkpoint_stale')
+    }
+    // Merged, not replaced: the replay that preceded this stamped the recovery operation ids.
+    return { ...current, fork: { ...current.fork, ...fork, phase: 'prepared' } }
+  })
 }
 
 export function proveStructuredForkAcquisition(
@@ -83,11 +138,23 @@ export async function publishStructuredForkJournal(
       }
       return { ...item, body: item.body }
     })
-    await journal.replaceEpochItems(
-      'handle_forked',
-      record.lease.runtimeFence,
-      forkJournalSeed(items, fork.source, head.handle)
-    )
+    const seed = forkJournalSeed(items, fork.source, head.handle)
+    // A crash after the journal transaction must settle its existing epoch, not replace it twice.
+    // The child journal is opened and seeded before its event sink is bound, so on re-entry it
+    // holds exactly the seed; anything else means the child moved on and must not be overwritten.
+    const landed = journal.snapshot().items.map(({ itemId, body }) => ({ itemId, body }))
+    if (landed.length > 0) {
+      if (
+        !isDeepStrictEqual(
+          landed,
+          seed.map(({ identity, body }) => ({ itemId: agentJournalItemKey(identity), body }))
+        )
+      ) {
+        throw new Error('agent_session_operation_invalid')
+      }
+    } else {
+      await journal.replaceEpochItems('handle_forked', record.lease.runtimeFence, seed)
+    }
     await store.transitionHandoff(record.sessionId, (current) => {
       if (
         current.lease.runtimeFence !== record.lease.runtimeFence ||

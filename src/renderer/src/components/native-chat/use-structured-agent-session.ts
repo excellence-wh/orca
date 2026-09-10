@@ -97,8 +97,11 @@ export function useStructuredAgentSession(args: {
       sessionId
     })
       .then(async (result) => {
+        // The probe is a separate RPC to the remote host. Its failure may only cost the fork
+        // affordance — the slash-command menu and this turn's options come from `result`.
         const forkSupported =
-          result.fork?.supported === true && (await structuredAgentSessionForkAvailable(target))
+          result.fork?.supported === true &&
+          (await structuredAgentSessionForkAvailable(target).catch(() => false))
         if (!stale) {
           setConversationSupport({
             sessionId,

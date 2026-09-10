@@ -2,6 +2,7 @@ import { forkJournalSeed } from './structured-fork-journal-seed'
 import { restoreRewindJournalBody } from './structured-rewind-journal-body'
 import type { AgentSessionRewindReason } from '../../../shared/agent-session-rewind'
 import { prepareStructuredForkReplay } from './structured-agent-session-fork-replay'
+import { restartRefusedStructuredFork } from './structured-agent-session-fork-lifecycle'
 import type { AgentSessionForkSource } from '../../../shared/agent-session-fork'
 import { agentSessionLeaseAdmitsWriter } from '../../../shared/agent-session-lease-adjudication'
 import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session-mutation-envelope'
@@ -65,7 +66,9 @@ export function forkStructuredAgentSession(
     ) {
       return refuse('invalid-target')
     }
-    let fork = prior
+    // A refused attempt proved no provider session exists, so the retry re-derives the prefix
+    // instead of replaying a record whose retained copy was dropped when it settled.
+    let fork = prior?.phase === 'refused' ? undefined : prior
     if (!fork) {
       const support = context.deps.adapter.forkSupport?.(source.sessionId)
       if (!support?.supported) {
@@ -140,9 +143,14 @@ export function forkStructuredAgentSession(
         fields: attachFingerprintFields(attach)
       })
     }
+    // Ordered: replay reads the settled `refused` record to mint the recovery envelope this
+    // existing child record requires, and only then is the record re-armed for a fresh attempt.
     const replay = await prepareStructuredForkReplay(context, caller, attach)
     if (replay.result) {
       return replay.result
+    }
+    if (prior?.phase === 'refused') {
+      await restartRefusedStructuredFork(store, params.envelope.sessionId, fork)
     }
     return attachStructuredAgentSession(attachContext, caller.callerKey, replay.params)
   })

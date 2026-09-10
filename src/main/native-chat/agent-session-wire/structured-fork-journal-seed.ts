@@ -32,6 +32,12 @@ export function forkJournalIdentity(
       ordinal: identity.ordinal
     }
   }
+  // Import-scoped bridge-era rows: no provider echo can ever reconcile against one, and the
+  // session id already names the provider conversation the child forks from, so it carries over
+  // verbatim rather than being minted into a namespace the child cannot reproduce.
+  if (identity.provider === 'legacy') {
+    return identity
+  }
   if (identity.provider === 'claude' && target.provider === 'claude') {
     // Forked files rewrite sessionId; retained UUIDs still belong to the parent namespace.
     return {
@@ -57,8 +63,9 @@ export function forkJournalSeed(
     if (!identity) {
       throw new Error('agent_session_identity_required')
     }
-    // Host status and submission identities belong to the parent's operation lifecycle.
-    if (identity.provider === 'orca') {
+    // Host status and submission identities belong to the parent's operation lifecycle. So does a
+    // turn-lifecycle row, whichever namespace it was keyed in — the child opens its own.
+    if (identity.provider === 'orca' || (item.body.kind === 'status' && item.body.turnLifecycle)) {
       return []
     }
     const rekeyed = forkJournalIdentity(identity, source, target)

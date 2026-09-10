@@ -85,13 +85,62 @@ describe('fork journal identities', () => {
     expect(() =>
       forkJournalIdentity({ provider: 'claude', sessionId: 'parent', uuid: 'id' }, source, target)
     ).toThrow('agent_session_identity_required')
-    expect(() =>
-      forkJournalIdentity(
-        { provider: 'legacy', agent: 'codex', sessionId: 'parent', recordId: '1' },
-        source,
-        target
-      )
-    ).toThrow('agent_session_identity_required')
+  })
+
+  it('carries an adopted transcript into the child and continues it on the new thread', () => {
+    // Adoption imports the whole prior conversation under `legacy:` keys, so a turn taken after
+    // adopting is a mix of legacy history and Codex echoes. Both belong in the child.
+    const imported = ['msg_1', 'msg_2'].map((recordId) => ({
+      itemId: agentJournalItemKey({
+        provider: 'legacy',
+        agent: 'codex',
+        sessionId: 'parent',
+        recordId
+      }),
+      body,
+      observedAt: 1
+    }))
+    const seed = forkJournalSeed(
+      [
+        ...imported,
+        { itemId: 'codex:parent:turn-a:0', body, observedAt: 2 },
+        { itemId: 'codex:parent:turn-a:1', body, observedAt: 3 }
+      ],
+      source,
+      target
+    )
+    expect(seed.map((item) => agentJournalItemKey(item.identity))).toEqual([
+      'legacy:codex:parent:msg_1',
+      'legacy:codex:parent:msg_2',
+      'codex:child:turn-a:0',
+      'codex:child:turn-a:1'
+    ])
+  })
+
+  it('leaves the parent turn-lifecycle row behind rather than seeding a phantom running turn', () => {
+    const lifecycle: AgentJournalItemBody = {
+      kind: 'status',
+      text: 'Codex is working…',
+      turnLifecycle: { turnId: 'turn-a', state: 'running' }
+    }
+    const seed = forkJournalSeed(
+      [
+        {
+          itemId: agentJournalItemKey({
+            provider: 'legacy',
+            agent: 'codex',
+            sessionId: 'parent',
+            recordId: 'turn-lifecycle:turn-a'
+          }),
+          body: lifecycle,
+          observedAt: 1
+        },
+        { itemId: 'codex:parent:turn-a:1', body, observedAt: 2 }
+      ],
+      source,
+      target
+    )
+    expect(seed.map((item) => agentJournalItemKey(item.identity))).toEqual(['codex:child:turn-a:1'])
   })
 
   it('does not retain source submission identities or prompt authority', () => {

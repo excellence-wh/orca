@@ -244,7 +244,6 @@ export function NativeChatMessageList({
           onScroll={handleScroll}
           className="scrollbar-sleek h-full overflow-y-auto [scrollbar-gutter:stable_both-edges] px-3 pt-10 pb-4 sm:px-4"
         >
-
           <div
             ref={contentRef}
             // Why: matches composer column (max-w-4xl) with 5px horizontal inset
@@ -314,7 +313,13 @@ export function NativeChatMessageList({
                     />
                   )}
                   {forkAction?.eligibleIds.has(message.id) ? (
-                    <Button variant="ghost" size="sm" className="self-start text-muted-foreground" disabled={forkAction.pending} onClick={() => forkAction.onFork(message.id)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="self-start text-muted-foreground"
+                      disabled={forkAction.pending}
+                      onClick={() => forkAction.onFork(message.id)}
+                    >
                       <GitFork className="size-3.5" />
                       {translate('components.native-chat.forkFromTurn', 'Fork from this turn')}
                     </Button>
@@ -355,7 +360,6 @@ export function NativeChatMessageList({
             ) : null}
             {!showTurnStatus && showTypingIndicator ? <NativeChatTypingIndicatorRow /> : null}
           </div>
-
         </div>
         {showJump ? (
           <button

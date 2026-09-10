@@ -7,32 +7,35 @@ import {
   agentSessionPrefixWithinBounds
 } from './agent-session-prefix-bounds'
 
-function items(provider: 'claude' | 'codex'): AgentJournalRenderItem[] {
-  return ['a', 'b'].flatMap(
-    (turnId, turn) =>
-      [
-        {
-          itemId:
-            provider === 'codex' ? `codex:parent:${turnId}:0` : `claude:parent:${turnId}-prompt`,
-          body: { kind: 'message', role: 'user', blocks: [] },
-          sequence: turn * 3,
-          observedAt: 1
-        },
-        {
-          itemId:
-            provider === 'codex' ? `codex:parent:${turnId}:1` : `claude:parent:${turnId}-answer`,
-          body: { kind: 'message', role: 'assistant', blocks: [] },
-          sequence: turn * 3 + 1,
-          observedAt: 1
-        },
-        {
-          itemId: `orca:${turnId}`,
-          body: { kind: 'status', text: 'Done', turnLifecycle: { turnId, state: 'completed' } },
-          sequence: turn * 3 + 2,
-          observedAt: 1
-        }
-      ] as AgentJournalRenderItem[]
-  )
+/** Models a real journal: settlement TOMBSTONES a turn's lifecycle row, so a finished turn leaves
+ *  none behind. Only a live turn has one, appended at turn start — before its answer. */
+function items(provider: 'claude' | 'codex', running?: string): AgentJournalRenderItem[] {
+  return ['a', 'b'].flatMap((turnId, turn) => {
+    const rows: AgentJournalRenderItem[] = [
+      {
+        itemId:
+          provider === 'codex' ? `codex:parent:${turnId}:0` : `claude:parent:${turnId}-prompt`,
+        body: { kind: 'message', role: 'user', blocks: [] },
+        sequence: turn * 3,
+        observedAt: 1
+      } as AgentJournalRenderItem
+    ]
+    if (running === turnId) {
+      rows.push({
+        itemId: `legacy:${provider}:parent:turn-lifecycle%3A${turnId}`,
+        body: { kind: 'status', text: 'Working', turnLifecycle: { turnId, state: 'running' } },
+        sequence: turn * 3 + 1,
+        observedAt: 1
+      } as AgentJournalRenderItem)
+    }
+    rows.push({
+      itemId: provider === 'codex' ? `codex:parent:${turnId}:1` : `claude:parent:${turnId}-answer`,
+      body: { kind: 'message', role: 'assistant', blocks: [] },
+      sequence: turn * 3 + 2,
+      observedAt: 1
+    } as AgentJournalRenderItem)
+    return rows
+  })
 }
 
 describe('bounded conversation prefix', () => {
@@ -53,11 +56,11 @@ describe('bounded conversation prefix', () => {
       expect(result).toMatchObject({ ok: true, throughId: provider === 'codex' ? 'a' : 'a-answer' })
       if (result.ok) {
         expect(result.retained.map((item) => item.itemId)).toEqual(
-          history.slice(0, 3).map((item) => item.itemId)
+          history.slice(0, 2).map((item) => item.itemId)
         )
       }
       expect(structuredForkEligibleItems(history)).toEqual(
-        new Set([history[1]!.itemId, history[4]!.itemId])
+        new Set([history[1]!.itemId, history[3]!.itemId])
       )
     }
   )
@@ -71,13 +74,13 @@ describe('bounded conversation prefix', () => {
           : ({ provider, sessionId: 'parent', leafUuid: 'b-answer' } as const)
       const result = selectAgentSessionPrefix({
         items: history,
-        itemId: history[4]!.itemId,
+        itemId: history[3]!.itemId,
         handle,
         boundary: 'before'
       })
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.retained).toHaveLength(provider === 'codex' ? 3 : 4)
+        expect(result.retained).toHaveLength(provider === 'codex' ? 2 : 3)
       }
     }
   })
@@ -97,13 +100,12 @@ describe('bounded conversation prefix', () => {
     expect(
       selectAgentSessionPrefix({ ...args, handle: { provider: 'codex', threadId: 'foreign' } })
     ).toMatchObject({ ok: false, reason: 'invalid-target' })
-    history[2]!.body = {
-      kind: 'status',
-      text: 'Working',
-      turnLifecycle: { turnId: 'a', state: 'running' }
-    }
-    expect(selectAgentSessionPrefix(args)).toMatchObject({ ok: false, reason: 'busy' })
-    expect(structuredForkEligibleItems(history).has(history[1]!.itemId)).toBe(false)
+    // A live turn: the running row is the one the producer actually leaves in the journal.
+    const live = items('codex', 'b')
+    expect(
+      selectAgentSessionPrefix({ ...args, items: live, itemId: live[4]!.itemId })
+    ).toMatchObject({ ok: false, reason: 'busy' })
+    expect(structuredForkEligibleItems(live)).toEqual(new Set([live[1]!.itemId]))
   })
 
   it('inherits the retained entry and UTF-8 byte bounds', () => {

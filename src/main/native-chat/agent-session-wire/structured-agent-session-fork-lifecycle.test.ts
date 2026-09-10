@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import type { AgentSessionForkRecord } from '../../../shared/agent-session-fork'
@@ -9,7 +9,9 @@ import { isAgentSessionRecord } from '../../../shared/agent-session-record'
 import {
   beginStructuredForkAttempt,
   proveStructuredForkAcquisition,
-  publishStructuredForkJournal
+  publishStructuredForkJournal,
+  refuseStructuredForkAttempt,
+  restartRefusedStructuredFork
 } from './structured-agent-session-fork-lifecycle'
 
 const NOW = 1_800_000_000_000
@@ -197,5 +199,110 @@ describe('durable fork lifecycle', () => {
         observedAt: NOW
       })
     ).toThrow('agent_session_provider_handle_invalid')
+  })
+
+  it('settles an attempt that never reached the provider and drops its stranded prefix', async () => {
+    const { store, record, fork } = await prepare()
+    await beginStructuredForkAttempt(store, record)
+    await refuseStructuredForkAttempt(store, record, 'managed account is switching')
+    // The store re-serializes in full on every lease renewal, so the dead prefix must not survive.
+    expect(store.getRecord(record.sessionId)?.fork).toMatchObject({
+      phase: 'refused',
+      reason: 'managed account is switching',
+      retained: []
+    })
+    expect(isAgentSessionRecord(store.getRecord(record.sessionId))).toBe(true)
+    // A refused record is terminal: it is re-armed deliberately, never resumed in place.
+    await expect(
+      beginStructuredForkAttempt(store, store.getRecord(record.sessionId)!)
+    ).rejects.toThrow('agent_session_operation_unknown')
+    await restartRefusedStructuredFork(store, record.sessionId, fork)
+    expect(
+      await beginStructuredForkAttempt(store, store.getRecord(record.sessionId)!)
+    ).toMatchObject({ throughId: 'turn' })
+  })
+
+  it('leaves an ambiguous outcome under the guard rather than settling it', async () => {
+    const { store, record } = await prepare()
+    await beginStructuredForkAttempt(store, record)
+    await store.commitProcessIdentity({
+      sessionId: record.sessionId,
+      fence: 1,
+      process: { hostId: 'local', pid: 123, processStartTimeMs: NOW, spawnToken: 'child-token' },
+      now: NOW
+    })
+    const proved = await store.proveOwner({
+      sessionId: record.sessionId,
+      fence: 1,
+      now: NOW,
+      link: proveStructuredForkAcquisition(record, {
+        linkId: 'fork-link',
+        handle: { provider: 'codex', threadId: 'child' },
+        origin: 'created',
+        mintedAtFence: 1,
+        observedAt: NOW
+      })
+    })
+    expect(proved.fork?.phase).toBe('provider-succeeded')
+    // A provider session may already exist here; settling would license a second one.
+    await refuseStructuredForkAttempt(store, proved, 'too late')
+    expect(store.getRecord(record.sessionId)?.fork?.phase).toBe('provider-succeeded')
+  })
+
+  it('settles its existing epoch after a crash instead of replacing the child journal twice', async () => {
+    const { root, store, record } = await prepare()
+    await beginStructuredForkAttempt(store, record)
+    await store.commitProcessIdentity({
+      sessionId: record.sessionId,
+      fence: 1,
+      process: { hostId: 'local', pid: 123, processStartTimeMs: NOW, spawnToken: 'child-token' },
+      now: NOW
+    })
+    const proved = await store.proveOwner({
+      sessionId: record.sessionId,
+      fence: 1,
+      now: NOW,
+      link: proveStructuredForkAcquisition(record, {
+        linkId: 'fork-link',
+        handle: { provider: 'codex', threadId: 'child' },
+        origin: 'created',
+        mintedAtFence: 1,
+        observedAt: NOW
+      })
+    })
+    const openJournal = async () => {
+      const journal = new AgentSessionJournal({
+        journalDir: join(root, 'journal'),
+        identity: {
+          sessionId: record.sessionId,
+          workspaceId: 'workspace',
+          hostId: 'local',
+          agent: 'codex',
+          providerHandle: { kind: 'codex', threadId: 'child' }
+        }
+      })
+      journals.push(journal)
+      await journal.open()
+      return journal
+    }
+    // Crash in the window between the journal transaction and the completion transition.
+    const transition = vi
+      .spyOn(store, 'transitionHandoff')
+      .mockRejectedValueOnce(new Error('host exited'))
+    await expect(publishStructuredForkJournal(store, proved, await openJournal())).rejects.toThrow(
+      'host exited'
+    )
+    transition.mockRestore()
+    expect(store.getRecord(record.sessionId)?.fork?.phase).toBe('provider-succeeded')
+
+    const reopened = await openJournal()
+    const epoch = reopened.cursor().epoch
+    await publishStructuredForkJournal(store, store.getRecord(record.sessionId)!, reopened)
+    expect(reopened.cursor().epoch).toBe(epoch)
+    expect(reopened.snapshot().items.map((item) => item.itemId)).toEqual(['codex:child:turn:0'])
+    expect(store.getRecord(record.sessionId)).toMatchObject({
+      schemaVersion: 2,
+      fork: { phase: 'completed', retained: [] }
+    })
   })
 })

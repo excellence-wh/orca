@@ -9,9 +9,10 @@ import type { AgentSessionForkSource } from '../../../shared/agent-session-fork'
 import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session-mutation-envelope'
 import { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { AgentSessionJournal } from '../agent-session-journal/journal-store'
-import type {
-  StructuredAgentSessionAdapter,
-  StructuredAgentSessionAcquireInput
+import {
+  AgentSessionPreSpawnError,
+  type StructuredAgentSessionAdapter,
+  type StructuredAgentSessionAcquireInput
 } from './structured-agent-session-adapter'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import {
@@ -61,6 +62,8 @@ async function setup(provider: 'claude' | 'codex' = 'codex') {
             sessionId: isChild ? 'child-thread' : 'parent-thread',
             leafUuid: forked ? input.fork!.throughId : 'turn-2-1'
           } as const)
+    // Settlement TOMBSTONES a turn's lifecycle row, so a finished turn leaves none behind. A
+    // fixture that appends `turnLifecycle.state: 'completed'` models no journal Orca can produce.
     if (!isChild) {
       for (const turn of ['turn-1', 'turn-2']) {
         input.events?.appendItem(identity(turn, 0), {
@@ -73,10 +76,6 @@ async function setup(provider: 'claude' | 'codex' = 'codex') {
           role: 'assistant',
           blocks: [{ type: 'text', text: `${turn} answer` }]
         })
-        input.events?.appendItem(
-          { provider: 'orca', clientMessageId: `${turn}-done` },
-          { kind: 'status', text: 'Completed', turnLifecycle: { turnId: turn, state: 'completed' } }
-        )
       }
     }
     return {
@@ -104,10 +103,6 @@ async function setup(provider: 'claude' | 'codex' = 'codex') {
       role: 'assistant',
       blocks: [{ type: 'text', text: 'Third answer' }]
     })
-    input.events?.appendItem(
-      { provider: 'orca', clientMessageId: 'turn-3-done' },
-      { kind: 'status', text: 'Completed', turnLifecycle: { turnId: 'turn-3', state: 'completed' } }
-    )
     return { state: 'accepted', providerIdentity: identity('turn-3', 0) }
   })
   const adapter: StructuredAgentSessionAdapter = {
@@ -256,8 +251,26 @@ describe('fork from a structured turn', () => {
     expect(store.getRecord('child-session')?.fork?.phase).toBe('attempted')
     expect(store.getVisibleSessionTabIndex().sessionIds).not.toContain('child-session')
     expect(host.hasSession('child-session')).toBe(false)
-    await host.fork(caller, child, source)
+    // The ambiguity guard: the provider may hold a child, so the retry must never make a second.
+    expect(await host.fork(caller, child, source)).toMatchObject({ ok: false })
     expect(acquire).toHaveBeenCalledTimes(2)
+  })
+
+  it('recovers a fork whose launch failed before any provider session existed', async () => {
+    const { host, store, child, source, acquire } = await setup()
+    acquire.mockImplementationOnce(async () => {
+      throw new AgentSessionPreSpawnError(new Error('managed account is switching'))
+    })
+    await expect(host.fork(caller, child, source)).rejects.toThrow('managed account is switching')
+    // Settled, not stranded — and the dead prefix is dropped rather than rewritten on every
+    // lease renewal for the life of the record.
+    expect(store.getRecord('child-session')?.fork).toMatchObject({
+      phase: 'refused',
+      retained: []
+    })
+    expect(await host.fork(caller, child, source)).toMatchObject({ ok: true })
+    expect(host.journalSnapshot('child-session').items).not.toHaveLength(0)
+    expect(acquire.mock.calls.filter(([input]) => input.fork)).toHaveLength(2)
   })
 
   it('resumes the proved child when journal publication fails instead of forking again', async () => {

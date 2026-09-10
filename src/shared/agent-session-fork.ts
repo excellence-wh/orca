@@ -33,7 +33,11 @@ export const AgentSessionForkRecordSchema = z.object({
   expectedRuntimeFence: z.number().int().positive(),
   source: z.custom<AgentSessionProviderHandle>(isAgentSessionProviderHandle),
   throughId: Key,
-  phase: z.enum(['prepared', 'attempted', 'provider-succeeded', 'completed']),
+  /** `attempted` is the ambiguity guard: the provider may or may not hold a child, so it never
+   *  retries. `refused` is its terminal counterpart for a failure that provably preceded any
+   *  provider session, and is recoverable. */
+  phase: z.enum(['prepared', 'attempted', 'provider-succeeded', 'completed', 'refused']),
+  reason: z.string().min(1).max(512).optional(),
   retained: z
     .array(
       z.object({

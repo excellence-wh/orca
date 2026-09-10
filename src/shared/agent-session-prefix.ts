@@ -2,10 +2,15 @@ import {
   agentJournalSubmissionKey,
   parseAgentJournalItemKey
 } from './agent-session-journal-item-key'
-import type { AgentJournalRenderItem, AgentJournalSnapshot } from './agent-session-journal-types'
+import type {
+  AgentJournalItemIdentity,
+  AgentJournalRenderItem,
+  AgentJournalSnapshot
+} from './agent-session-journal-types'
 import type { AgentSessionProviderHandle } from './agent-session-provider-handle'
 import type { AgentSessionRewindReason, AgentSessionRewindRecord } from './agent-session-rewind'
 import { agentSessionPrefixWithinBounds } from './agent-session-prefix-bounds'
+import { activeStructuredAgentSessionTurnId } from './structured-agent-session-projection'
 
 type PrefixSelection =
   | { ok: false; reason: AgentSessionRewindReason }
@@ -125,38 +130,57 @@ export function selectAgentSessionPrefix(
   }
 }
 
+/** End of the turn containing `selected`, or null while that turn is still live.
+ *
+ *  Settlement TOMBSTONES a turn's lifecycle row rather than rewriting it to `completed`, so a
+ *  finished turn leaves no row behind and only the live turn still has one. Completion is
+ *  therefore read as "not the active turn", off the same projection the chat view reads. */
 function completedTurnEnd(
   items: readonly AgentJournalRenderItem[],
   selected: number,
   providerKey: (id: string) => string
 ): number | null {
-  const key = parseAgentJournalItemKey(providerKey(items[selected]!.itemId))
   const nextPrompt = items.findIndex(
     (item, index) => index > selected && item.body.kind === 'message' && item.body.role === 'user'
   )
-  const end = nextPrompt === -1 ? items.length : nextPrompt
-  const lifecycle = items
-    .slice(selected, end)
-    .findLast(
-      (item) =>
-        item.body.kind === 'status' &&
-        item.body.turnLifecycle &&
-        (key?.provider !== 'codex' || item.body.turnLifecycle.turnId === key.turnId)
-    )
-  return lifecycle?.body.kind === 'status' && lifecycle.body.turnLifecycle?.state === 'completed'
-    ? end
-    : null
+  const key = parseAgentJournalItemKey(providerKey(items[selected]!.itemId))
+  return liveTurn(activeStructuredAgentSessionTurnId(items), key, nextPrompt === -1)
+    ? null
+    : nextPrompt === -1
+      ? items.length
+      : nextPrompt
+}
+
+/** Codex names the live turn in its own item keys; Claude does not, and a running turn is always
+ *  the newest one, so a Claude row is live exactly when no later prompt bounds it. */
+function liveTurn(
+  activeTurnId: string | null,
+  key: AgentJournalItemIdentity | null,
+  isLastTurn: boolean
+): boolean {
+  if (activeTurnId === null) {
+    return false
+  }
+  return key?.provider === 'codex' ? key.turnId === activeTurnId : isLastTurn
 }
 
 export function structuredForkEligibleItems(items: readonly AgentJournalRenderItem[]): Set<string> {
-  return new Set(
-    items
-      .filter(
-        (item, index) =>
-          item.body.kind === 'message' &&
-          item.body.role === 'assistant' &&
-          completedTurnEnd(items, index, (id) => id) !== null
-      )
-      .map((item) => item.itemId)
+  const activeTurnId = activeStructuredAgentSessionTurnId(items)
+  const lastPrompt = items.findLastIndex(
+    (item) => item.body.kind === 'message' && item.body.role === 'user'
   )
+  const eligible = new Set<string>()
+  items.forEach((item, index) => {
+    if (item.body.kind !== 'message' || item.body.role !== 'assistant') {
+      return
+    }
+    // Parsing every key is wasted work on the idle journal a fork is actually taken from.
+    if (
+      activeTurnId === null ||
+      !liveTurn(activeTurnId, parseAgentJournalItemKey(item.itemId), index > lastPrompt)
+    ) {
+      eligible.add(item.itemId)
+    }
+  })
+  return eligible
 }

@@ -1,6 +1,7 @@
 import {
   beginStructuredForkAttempt,
-  proveStructuredForkAcquisition
+  proveStructuredForkAcquisition,
+  refuseStructuredForkAttempt
 } from './structured-agent-session-fork-lifecycle'
 import { isDeepStrictEqual } from 'node:util'
 import { claudeRewindAcquisitionProofs } from './structured-rewind-claude-proof'
@@ -80,8 +81,16 @@ export async function acquireOwner(
     }
   } catch (error) {
     if (isAgentSessionPreSpawnError(error)) {
+      // The launch never resolved, so no provider session can exist: settle the attempt rather
+      // than strand it. A failure past this point stays ambiguous and keeps the guard.
+      await refuseStructuredForkAttempt(input.store, record, describePreSpawnRefusal(error))
       throw error
     }
     return rethrowAfterAgentSessionAcquisitionCleanup(input.adapter, record.sessionId, error)
   }
+}
+
+function describePreSpawnRefusal(error: unknown): string {
+  const cause = error instanceof Error ? (error.cause ?? error) : error
+  return cause instanceof Error && cause.message ? cause.message : 'agent_session_pre_spawn'
 }

@@ -5,6 +5,8 @@ import type { useStructuredAgentSession } from './use-structured-agent-session'
 import { forkStructuredSessionFromTurn } from './structured-agent-session-fork-command'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 
+const NO_ELIGIBLE_ITEMS: ReadonlySet<string> = new Set()
+
 export function useStructuredForkAction(
   props: Omit<NativeChatStructuredViewProps, 'mode'>,
   controller: ReturnType<typeof useStructuredAgentSession>,
@@ -12,18 +14,22 @@ export function useStructuredForkAction(
   onError: (message: string) => void
 ) {
   const [pending, setPending] = useState(false)
-  const eligibleIds = useMemo(
-    () => structuredForkEligibleItems(controller.journalItems ?? []),
-    [controller.journalItems]
-  )
   const agent = props.agent === 'claude' ? 'claude' : props.agent === 'codex' ? 'codex' : undefined
-  if (
-    !controller.forkSupported ||
-    !controller.forkSource ||
-    !worktreeId ||
-    controller.isWorking ||
-    !agent
-  ) {
+  const enabled = Boolean(
+    controller.forkSupported &&
+    controller.forkSource &&
+    worktreeId &&
+    !controller.isWorking &&
+    agent
+  )
+  // Hooks cannot be skipped, so the unavailable case is gated inside the memo instead: a live turn
+  // emits a journal delta per frame and every one of them would rescan for a discarded result.
+  const eligibleIds = useMemo(
+    () =>
+      enabled ? structuredForkEligibleItems(controller.journalItems ?? []) : NO_ELIGIBLE_ITEMS,
+    [enabled, controller.journalItems]
+  )
+  if (!enabled || !controller.forkSource || !worktreeId || !agent) {
     return undefined
   }
   return {
