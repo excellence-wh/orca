@@ -140,18 +140,18 @@ export function createRedmineActions(
       const key = redmineIssueCacheKey(issueId)
       const cached = get().redmineIssueCache[key]
       if (!options?.force && cached?.data && isFresh(cached)) {
-        return cached.data
+        return { issue: cached.data }
       }
-      const issue = await redmineGetIssue(get().settings, issueId)
-      if (issue && generation === requestGeneration) {
+      const result = await redmineGetIssue(get().settings, issueId)
+      if (result.issue && generation === requestGeneration) {
         set((state) => ({
           redmineIssueCache: {
             ...state.redmineIssueCache,
-            [key]: { data: issue, fetchedAt: Date.now() }
+            [key]: { data: result.issue, fetchedAt: Date.now() }
           }
         }))
       }
-      return issue
+      return result
     },
 
     invalidateRedmineIssueLists: () => {

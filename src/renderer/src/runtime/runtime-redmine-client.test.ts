@@ -104,15 +104,15 @@ describe('redmineStatus / getIssue', () => {
 
   it('reads a single issue from window.api locally', async () => {
     getActiveRuntimeTarget.mockReturnValue(localTarget())
-    windowApiRedmine.getIssue.mockResolvedValue(issue)
+    windowApiRedmine.getIssue.mockResolvedValue({ issue })
     const result = await redmineGetIssue(null, 1)
     expect(windowApiRedmine.getIssue).toHaveBeenCalledWith({ issueId: 1 })
-    expect(result?.id).toBe(1)
+    expect(result.issue?.id).toBe(1)
   })
 
   it('routes getIssue through runtime RPC remotely', async () => {
     getActiveRuntimeTarget.mockReturnValue(remoteTarget())
-    callRuntimeRpc.mockResolvedValue(issue)
+    callRuntimeRpc.mockResolvedValue({ issue })
     const result = await redmineGetIssue(null, 2)
     expect(callRuntimeRpc).toHaveBeenCalledWith(
       remoteTarget(),
@@ -120,7 +120,14 @@ describe('redmineStatus / getIssue', () => {
       { issueId: 2 },
       expect.anything()
     )
-    expect(result?.id).toBe(1)
+    expect(result.issue?.id).toBe(1)
+  })
+
+  it('normalizes a malformed getIssue payload to issue:null', async () => {
+    getActiveRuntimeTarget.mockReturnValue(localTarget())
+    windowApiRedmine.getIssue.mockResolvedValue(null)
+    const result = await redmineGetIssue(null, 1)
+    expect(result).toEqual({ issue: null })
   })
 })
 

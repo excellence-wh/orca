@@ -4,6 +4,7 @@ import type {
   RedmineIssue,
   RedmineIssueCollectionResult,
   RedmineListFilter,
+  RedmineReadError,
   RedmineSite,
   RedmineUser
 } from '../../../shared/redmine-types'
@@ -135,17 +136,35 @@ export async function redmineListIssues(
   return normalizeRedmineIssueCollectionResult(result)
 }
 
+export type RedmineIssueDetailResult = {
+  issue: RedmineIssue | null
+  error?: RedmineReadError
+}
+
 export async function redmineGetIssue(
   settings: RuntimeRedmineSettings,
   issueId: number
-): Promise<RedmineIssue | null> {
+): Promise<RedmineIssueDetailResult> {
   const target = getRedmineRuntimeTarget(settings)
-  return target.kind === 'environment'
-    ? callRuntimeRpc<RedmineIssue | null>(
-        target,
-        'redmine.getIssue',
-        { issueId },
-        { timeoutMs: 30_000 }
-      )
-    : window.api.redmine.getIssue({ issueId })
+  const result: unknown =
+    target.kind === 'environment'
+      ? await callRuntimeRpc<unknown>(
+          target,
+          'redmine.getIssue',
+          { issueId },
+          { timeoutMs: 30_000 }
+        )
+      : await window.api.redmine.getIssue({ issueId })
+  return normalizeRedmineIssueDetailResult(result)
+}
+
+function normalizeRedmineIssueDetailResult(result: unknown): RedmineIssueDetailResult {
+  if (!result || typeof result !== 'object') {
+    return { issue: null }
+  }
+  const detail = result as Partial<RedmineIssueDetailResult>
+  return {
+    issue: detail.issue ?? null,
+    ...(detail.error ? { error: detail.error } : {})
+  }
 }

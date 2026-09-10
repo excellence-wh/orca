@@ -216,9 +216,9 @@ describe('getRedmineIssue', () => {
       customFields: [],
       url: 'https://rm.example.com/issues/1'
     }
-    redmineGetIssueMock.mockResolvedValue(issue)
+    redmineGetIssueMock.mockResolvedValue({ issue })
     const result = await actions.getRedmineIssue(1)
-    expect(result?.id).toBe(1)
+    expect(result.issue?.id).toBe(1)
     redmineGetIssueMock.mockClear()
     await actions.getRedmineIssue(1)
     expect(redmineGetIssueMock).not.toHaveBeenCalled()

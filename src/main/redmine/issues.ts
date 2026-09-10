@@ -20,9 +20,10 @@ export async function listRedmineIssues(
   filter: RedmineListFilter = {}
 ): Promise<RedmineIssueCollectionResult> {
   const params = new URLSearchParams()
-  params.set('limit', String(Math.min(filter.limit ?? 20, 100)))
-  const page = Math.max(filter.page ?? 1, 1)
-  params.set('offset', String((page - 1) * (filter.limit ?? 20)))
+  const limit = Math.min(Math.max(Math.floor(filter.limit ?? 20), 1), 100)
+  const page = Math.max(Math.floor(filter.page ?? 1), 1)
+  params.set('limit', String(limit))
+  params.set('offset', String((page - 1) * limit))
 
   if (filter.scope === 'assigned') {
     params.set('assigned_to_id', 'me')

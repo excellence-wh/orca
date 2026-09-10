@@ -5,6 +5,7 @@ import type {
   RedmineIssue,
   RedmineIssueCollectionResult,
   RedmineListFilter,
+  RedmineReadError,
   RedmineSite,
   RedmineUser
 } from '../../../../../shared/redmine-types'
@@ -37,7 +38,10 @@ export type RedmineSlice = {
     filter?: RedmineListFilter,
     options?: RedmineFetchOptions
   ) => Promise<RedmineIssueCollectionResult>
-  getRedmineIssue: (issueId: number, options?: RedmineFetchOptions) => Promise<RedmineIssue | null>
+  getRedmineIssue: (
+    issueId: number,
+    options?: RedmineFetchOptions
+  ) => Promise<{ issue: RedmineIssue | null; error?: RedmineReadError }>
   invalidateRedmineIssueLists: () => void
 }
 

@@ -129,6 +129,7 @@ export function TaskPageRedmineContent({
           return
         }
         setIssues(result?.items ?? [])
+        setError(result?.error?.message ?? null)
         setLoading(false)
       })
       .catch(() => {
@@ -145,7 +146,7 @@ export function TaskPageRedmineContent({
 
   function openIssue(issue: RedmineIssue) {
     setSelected(issue)
-    void getRedmineIssue(issue.id).then((full) => {
+    void getRedmineIssue(issue.id).then(({ issue: full }) => {
       if (full) {
         setSelected(full)
       }

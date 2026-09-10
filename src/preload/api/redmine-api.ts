@@ -4,6 +4,7 @@ import type {
   RedmineIssue,
   RedmineIssueCollectionResult,
   RedmineListFilter,
+  RedmineReadError,
   RedmineSite,
   RedmineUser
 } from '../../shared/redmine-types'
@@ -23,5 +24,8 @@ export type RedmineApi = {
     apiKey: string
   }) => Promise<{ ok: true; user: RedmineUser } | { ok: false; error: RedmineConnectionError }>
   listIssues: (args?: { filter?: RedmineListFilter }) => Promise<RedmineIssueCollectionResult>
-  getIssue: (args: { issueId: number }) => Promise<RedmineIssue | null>
+  getIssue: (args: { issueId: number }) => Promise<{
+    issue: RedmineIssue | null
+    error?: RedmineReadError
+  }>
 }

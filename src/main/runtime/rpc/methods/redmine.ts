@@ -5,10 +5,11 @@ import {
   connectRedmineSite,
   disconnectRedmineSite,
   getRedmineStatus,
+  redmineReadErrorForCredentials,
+  resolveRedmineCredentials,
   testRedmineConnection
 } from '../../../redmine/client'
-import { getRedmineIssue, listRedmineIssues } from '../../../redmine/issues'
-import { readToken } from '../../../redmine/redmine-site-store'
+import { getRedmineIssue, listRedmineIssues, RedmineRequestError } from '../../../redmine/issues'
 
 const SiteWithKey = z.object({
   siteUrl: requiredString('Server URL is required'),
@@ -40,20 +41,7 @@ const IssueId = z.object({
 
 // Why: the host owns the Redmine site store (~/.orca/redmine-sites.json +
 // encrypted tokens), so it resolves the active site's credentials server-side,
-// mirroring the main-process IPC handler.
-function activeCredentials(): { siteUrl: string; apiKey: string } | null {
-  const status = getRedmineStatus()
-  const site = status.activeSite
-  if (!site) {
-    return null
-  }
-  const apiKey = readToken(site.id)
-  if (!apiKey) {
-    return null
-  }
-  return { siteUrl: site.siteUrl, apiKey }
-}
-
+// mirroring the main-process IPC handler via the shared resolver.
 export const REDMINE_METHODS: RpcAnyMethod[] = [
   defineMethod({
     name: 'redmine.status',
@@ -92,26 +80,40 @@ export const REDMINE_METHODS: RpcAnyMethod[] = [
     name: 'redmine.listIssues',
     params: List,
     handler: async (params) => {
-      const creds = activeCredentials()
-      if (!creds) {
+      const creds = resolveRedmineCredentials()
+      if (!creds.ok) {
         return {
           items: [],
           totalCount: 0,
-          error: { type: 'auth', message: 'No Redmine site connected.' }
+          error: redmineReadErrorForCredentials(creds.reason)
         }
       }
-      return listRedmineIssues(creds.siteUrl, creds.apiKey, params?.filter ?? {})
+      try {
+        return await listRedmineIssues(creds.siteUrl, creds.apiKey, params?.filter ?? {})
+      } catch (error) {
+        if (error instanceof RedmineRequestError) {
+          return { items: [], totalCount: 0, error: error.classified }
+        }
+        throw error
+      }
     }
   }),
   defineMethod({
     name: 'redmine.getIssue',
     params: IssueId,
     handler: async (params) => {
-      const creds = activeCredentials()
-      if (!creds) {
-        return null
+      const creds = resolveRedmineCredentials()
+      if (!creds.ok) {
+        return { issue: null, error: redmineReadErrorForCredentials(creds.reason) }
       }
-      return getRedmineIssue(creds.siteUrl, creds.apiKey, params.issueId)
+      try {
+        return { issue: await getRedmineIssue(creds.siteUrl, creds.apiKey, params.issueId) }
+      } catch (error) {
+        if (error instanceof RedmineRequestError) {
+          return { issue: null, error: error.classified }
+        }
+        throw error
+      }
     }
   })
 ]

@@ -4,10 +4,11 @@ import {
   connectRedmineSite,
   disconnectRedmineSite,
   getRedmineStatus,
+  redmineReadErrorForCredentials,
+  resolveRedmineCredentials,
   testRedmineConnection
 } from '../redmine/client'
-import { getRedmineIssue, listRedmineIssues } from '../redmine/issues'
-import { readToken } from '../redmine/redmine-site-store'
+import { getRedmineIssue, listRedmineIssues, RedmineRequestError } from '../redmine/issues'
 
 export function registerRedmineHandlers(): void {
   ipcMain.handle('redmine:connect', async (_event, args: { siteUrl?: string; apiKey?: string }) => {
@@ -59,39 +60,40 @@ export function registerRedmineHandlers(): void {
   )
 
   ipcMain.handle('redmine:listIssues', async (_event, args?: { filter?: RedmineListFilter }) => {
-    const creds = activeCredentials()
-    if (!creds) {
+    const creds = resolveRedmineCredentials()
+    if (!creds.ok) {
       return {
         items: [],
         totalCount: 0,
-        error: { type: 'auth', message: 'No Redmine site connected.' }
+        error: redmineReadErrorForCredentials(creds.reason)
       }
     }
-    return listRedmineIssues(creds.siteUrl, creds.apiKey, args?.filter ?? {})
+    try {
+      return await listRedmineIssues(creds.siteUrl, creds.apiKey, args?.filter ?? {})
+    } catch (error) {
+      if (error instanceof RedmineRequestError) {
+        return { items: [], totalCount: 0, error: error.classified }
+      }
+      throw error
+    }
   })
 
   ipcMain.handle('redmine:getIssue', async (_event, args?: { issueId?: number }) => {
-    const creds = activeCredentials()
+    const creds = resolveRedmineCredentials()
     const issueId = typeof args?.issueId === 'number' ? args.issueId : Number.NaN
-    if (!creds) {
-      return null
+    if (!creds.ok) {
+      return { issue: null, error: redmineReadErrorForCredentials(creds.reason) }
     }
     if (!Number.isFinite(issueId)) {
-      return null
+      return { issue: null }
     }
-    return getRedmineIssue(creds.siteUrl, creds.apiKey, issueId)
+    try {
+      return { issue: await getRedmineIssue(creds.siteUrl, creds.apiKey, issueId) }
+    } catch (error) {
+      if (error instanceof RedmineRequestError) {
+        return { issue: null, error: error.classified }
+      }
+      throw error
+    }
   })
-}
-
-function activeCredentials(): { siteUrl: string; apiKey: string } | null {
-  const status = getRedmineStatus()
-  const site = status.activeSite
-  if (!site) {
-    return null
-  }
-  const apiKey = readToken(site.id)
-  if (!apiKey) {
-    return null
-  }
-  return { siteUrl: site.siteUrl, apiKey }
 }

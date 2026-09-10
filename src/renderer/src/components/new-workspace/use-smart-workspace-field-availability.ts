@@ -85,8 +85,7 @@ export function useSmartWorkspaceFieldAvailability({
     () =>
       filterAvailableTaskProviders(['github', 'gitlab', 'linear'], {
         gitlabInstalled: gitlabSourceAvailable,
-        linearConnected: linearStatus.connected === true,
-        redmineConnected: false
+        linearConnected: linearStatus.connected === true
       }),
     [gitlabSourceAvailable, linearStatus.connected]
   )

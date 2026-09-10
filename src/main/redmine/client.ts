@@ -1,4 +1,9 @@
-import type { RedmineConnectionStatus, RedmineSite, RedmineUser } from '../../shared/redmine-types'
+import type {
+  RedmineConnectionStatus,
+  RedmineReadError,
+  RedmineSite,
+  RedmineUser
+} from '../../shared/redmine-types'
 import { classifyRedmineError, normalizeRedmineUrl, redmineRequest } from './redmine-request'
 import {
   credentialErrors,
@@ -9,6 +14,7 @@ import {
   saveToken,
   writeSiteFile
 } from './redmine-site-store'
+import { CredentialDecryptionError } from '../integration-credential-file'
 
 const TEST_REQUEST_TIMEOUT_MS = 8000
 
@@ -133,4 +139,50 @@ export function getRedmineStatus(): RedmineConnectionStatus {
 
 export function _readRedmineTokenForTest(siteId: string): string | null {
   return readToken(siteId)
+}
+
+export type RedmineReadCredentials =
+  | { ok: true; siteUrl: string; apiKey: string }
+  | { ok: false; reason: 'no_site' | 'no_token' | 'decryption' }
+
+// Why: shared by the IPC and runtime-RPC read handlers so a credential that
+// cannot be decrypted (keychain denied / app re-signed) surfaces a structured
+// reconnect error instead of rejecting callers who own the result shape.
+export function resolveRedmineCredentials(): RedmineReadCredentials {
+  const status = getRedmineStatus()
+  const site = status.activeSite
+  if (!site) {
+    return { ok: false, reason: 'no_site' }
+  }
+  try {
+    const apiKey = readToken(site.id)
+    if (!apiKey) {
+      return { ok: false, reason: 'no_token' }
+    }
+    return { ok: true, siteUrl: site.siteUrl, apiKey }
+  } catch (error) {
+    if (error instanceof CredentialDecryptionError) {
+      return { ok: false, reason: 'decryption' }
+    }
+    throw error
+  }
+}
+
+export function redmineReadErrorForCredentials(
+  reason: 'no_site' | 'no_token' | 'decryption'
+): RedmineReadError {
+  switch (reason) {
+    case 'no_site':
+      return { type: 'auth', message: 'No Redmine site connected.' }
+    case 'no_token':
+      return {
+        type: 'auth',
+        message: 'The Redmine site has no stored API key. Reconnect to add one.'
+      }
+    case 'decryption':
+      return {
+        type: 'auth',
+        message: 'Your stored Redmine API key could not be decrypted. Reconnect to re-enter it.'
+      }
+  }
 }

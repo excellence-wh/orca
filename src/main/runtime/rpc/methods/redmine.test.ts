@@ -5,34 +5,38 @@ import {
   connectRedmineSite,
   disconnectRedmineSite,
   getRedmineStatus,
+  redmineReadErrorForCredentials,
+  resolveRedmineCredentials,
   testRedmineConnection
 } from '../../../redmine/client'
-import { getRedmineIssue, listRedmineIssues } from '../../../redmine/issues'
-import { readToken } from '../../../redmine/redmine-site-store'
+import { getRedmineIssue, listRedmineIssues, RedmineRequestError } from '../../../redmine/issues'
 
 vi.mock('../../../redmine/client', () => ({
   connectRedmineSite: vi.fn(),
   disconnectRedmineSite: vi.fn(),
   getRedmineStatus: vi.fn(),
+  redmineReadErrorForCredentials: vi.fn(() => ({
+    type: 'auth',
+    message: 'No Redmine site connected.'
+  })),
+  resolveRedmineCredentials: vi.fn(() => ({ ok: false, reason: 'no_site' })),
   testRedmineConnection: vi.fn()
 }))
 
 vi.mock('../../../redmine/issues', () => ({
   getRedmineIssue: vi.fn(),
-  listRedmineIssues: vi.fn()
-}))
-
-vi.mock('../../../redmine/redmine-site-store', () => ({
-  readToken: vi.fn()
+  listRedmineIssues: vi.fn(),
+  RedmineRequestError: class RedmineRequestError extends Error {}
 }))
 
 const connectRedmineSiteMock = vi.mocked(connectRedmineSite)
 const disconnectRedmineSiteMock = vi.mocked(disconnectRedmineSite)
 const getRedmineStatusMock = vi.mocked(getRedmineStatus)
+const redmineReadErrorForCredentialsMock = vi.mocked(redmineReadErrorForCredentials)
+const resolveRedmineCredentialsMock = vi.mocked(resolveRedmineCredentials)
 const testRedmineConnectionMock = vi.mocked(testRedmineConnection)
 const getRedmineIssueMock = vi.mocked(getRedmineIssue)
 const listRedmineIssuesMock = vi.mocked(listRedmineIssues)
-const readTokenMock = vi.mocked(readToken)
 
 const registry = buildRegistry(REDMINE_METHODS)
 const ctx = {} as Parameters<RpcHandler<unknown>>[1]
@@ -68,6 +72,11 @@ async function invoke(name: string, params?: unknown): Promise<unknown> {
 beforeEach(() => {
   vi.clearAllMocks()
   getRedmineStatusMock.mockReturnValue(disconnectedStatus())
+  resolveRedmineCredentialsMock.mockReturnValue({ ok: false, reason: 'no_site' })
+  redmineReadErrorForCredentialsMock.mockReturnValue({
+    type: 'auth',
+    message: 'No Redmine site connected.'
+  })
 })
 
 describe('REDMINE_METHODS registration', () => {
@@ -153,27 +162,72 @@ describe('redmine.listIssues', () => {
   })
 
   it('lists issues with the active site credentials', async () => {
-    getRedmineStatusMock.mockReturnValue(connectedStatus())
-    readTokenMock.mockReturnValue('secret')
+    resolveRedmineCredentialsMock.mockReturnValue({
+      ok: true,
+      siteUrl: 'https://rm.example.com',
+      apiKey: 'secret'
+    })
     listRedmineIssuesMock.mockResolvedValue({ items: [], totalCount: 0 })
     await invoke('redmine.listIssues', { filter: { scope: 'assigned' } })
     expect(listRedmineIssuesMock).toHaveBeenCalledWith('https://rm.example.com', 'secret', {
       scope: 'assigned'
     })
   })
+
+  it('returns the classified error when the upstream request fails', async () => {
+    resolveRedmineCredentialsMock.mockReturnValue({
+      ok: true,
+      siteUrl: 'https://rm.example.com',
+      apiKey: 'secret'
+    })
+    const err = new RedmineRequestError({ type: 'auth', message: 'Invalid API key' }, null)
+    ;(err as { classified?: unknown }).classified = {
+      type: 'auth',
+      message: 'Invalid API key'
+    }
+    listRedmineIssuesMock.mockRejectedValue(err)
+    const result = await invoke('redmine.listIssues', {})
+    expect(result).toEqual({
+      items: [],
+      totalCount: 0,
+      error: { type: 'auth', message: 'Invalid API key' }
+    })
+  })
 })
 
 describe('redmine.getIssue', () => {
-  it('returns null when no site is connected', async () => {
-    expect(await invoke('redmine.getIssue', { issueId: 1 })).toBeNull()
+  it('returns an error when no site is connected', async () => {
+    expect(await invoke('redmine.getIssue', { issueId: 1 })).toEqual({
+      issue: null,
+      error: { type: 'auth', message: 'No Redmine site connected.' }
+    })
   })
 
   it('fetches the issue through the active site', async () => {
-    getRedmineStatusMock.mockReturnValue(connectedStatus())
-    readTokenMock.mockReturnValue('secret')
+    resolveRedmineCredentialsMock.mockReturnValue({
+      ok: true,
+      siteUrl: 'https://rm.example.com',
+      apiKey: 'secret'
+    })
     getRedmineIssueMock.mockResolvedValue({ id: 1 } as never)
     const result = await invoke('redmine.getIssue', { issueId: 1 })
     expect(getRedmineIssueMock).toHaveBeenCalledWith('https://rm.example.com', 'secret', 1)
-    expect(result).toMatchObject({ id: 1 })
+    expect(result).toEqual({ issue: { id: 1 } })
+  })
+
+  it('surfaces a decryption reason as an error', async () => {
+    resolveRedmineCredentialsMock.mockReturnValue({ ok: false, reason: 'decryption' })
+    redmineReadErrorForCredentialsMock.mockReturnValue({
+      type: 'auth',
+      message: 'Your stored Redmine API key could not be decrypted. Reconnect to re-enter it.'
+    })
+    const result = await invoke('redmine.getIssue', { issueId: 1 })
+    expect(result).toEqual({
+      issue: null,
+      error: {
+        type: 'auth',
+        message: 'Your stored Redmine API key could not be decrypted. Reconnect to re-enter it.'
+      }
+    })
   })
 })

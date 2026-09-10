@@ -61,7 +61,6 @@ export function normalizeVisibleTaskProviders(value: unknown): TaskProvider[] {
 export type TaskProviderAvailability = {
   gitlabInstalled: boolean
   linearConnected: boolean
-  redmineConnected: boolean
 }
 
 export function filterAvailableTaskProviders(
