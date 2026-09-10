@@ -16,7 +16,13 @@ describe('task providers', () => {
   })
 
   it('falls back to all providers when none are visible', () => {
-    expect(normalizeVisibleTaskProviders([])).toEqual(['github', 'gitlab', 'linear', 'jira'])
+    expect(normalizeVisibleTaskProviders([])).toEqual([
+      'github',
+      'gitlab',
+      'linear',
+      'jira',
+      'redmine'
+    ])
   })
 
   it('restores a valid saved default when provider settings drifted', () => {
@@ -51,7 +57,8 @@ describe('task providers', () => {
     expect(
       filterAvailableTaskProviders(['github', 'gitlab', 'linear'], {
         gitlabInstalled: false,
-        linearConnected: true
+        linearConnected: true,
+        redmineConnected: false
       })
     ).toEqual(['github', 'linear'])
   })
@@ -62,8 +69,9 @@ describe('task providers', () => {
         ['linear'],
         {
           gitlabInstalled: false,
-          linearConnected: true
-        },
+          linearConnected: true,
+          redmineConnected: false
+          },
         'github'
       )
     ).toEqual(['github', 'linear'])
@@ -75,8 +83,9 @@ describe('task providers', () => {
         ['linear'],
         {
           gitlabInstalled: false,
-          linearConnected: true
-        },
+          linearConnected: true,
+          redmineConnected: false
+          },
         'linear'
       )
     ).toEqual(['linear'])
@@ -88,8 +97,9 @@ describe('task providers', () => {
         ['linear'],
         {
           gitlabInstalled: false,
-          linearConnected: true
-        },
+          linearConnected: true,
+          redmineConnected: false
+          },
         'gitlab'
       )
     ).toEqual(['linear'])
@@ -101,8 +111,9 @@ describe('task providers', () => {
         ['gitlab'],
         {
           gitlabInstalled: false,
-          linearConnected: true
-        },
+          linearConnected: true,
+          redmineConnected: false
+          },
         'bitbucket'
       )
     ).toEqual(['github'])
@@ -112,7 +123,8 @@ describe('task providers', () => {
     expect(
       filterAvailableTaskProviders(['gitlab', 'linear'], {
         gitlabInstalled: false,
-        linearConnected: false
+        linearConnected: false,
+        redmineConnected: false
       })
     ).toEqual(['github'])
   })

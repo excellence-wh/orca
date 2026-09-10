@@ -1,6 +1,6 @@
-export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira'
+export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira' | 'redmine'
 
-export const TASK_PROVIDERS: readonly TaskProvider[] = ['github', 'gitlab', 'linear', 'jira']
+export const TASK_PROVIDERS: readonly TaskProvider[] = ['github', 'gitlab', 'linear', 'jira', 'redmine']
 
 const TASK_PROVIDER_SET = new Set<TaskProvider>(TASK_PROVIDERS)
 
@@ -55,6 +55,7 @@ export function normalizeVisibleTaskProviders(value: unknown): TaskProvider[] {
 export type TaskProviderAvailability = {
   gitlabInstalled: boolean
   linearConnected: boolean
+  redmineConnected: boolean
 }
 
 export function filterAvailableTaskProviders(
@@ -103,6 +104,11 @@ function isTaskProviderAvailable(
   // Why: Jira can be connected from the Tasks surface itself, so hiding it
   // when disconnected would remove the entry point for first-time setup.
   if (provider === 'jira') {
+    return true
+  }
+  // Why: same first-time-setup reasoning as Jira — a disconnected Redmine must
+  // stay reachable from the Tasks surface so a new site can be connected.
+  if (provider === 'redmine') {
     return true
   }
   return availability.linearConnected
