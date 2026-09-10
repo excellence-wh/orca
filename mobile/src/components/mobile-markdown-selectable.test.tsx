@@ -46,7 +46,7 @@ function flattenText(node: TestNode | string): string {
 function renderMarkdown(props: Parameters<typeof MobileMarkdown>[0]): TestNode {
   let renderer: ReactTestRenderer | null = null
   act(() => {
-    renderer = create(createElement(MobileMarkdown, props))
+    renderer = create(createElement(MobileMarkdown, { rangeSelectable: true, ...props }))
   })
   const tree = renderer!.toJSON() as unknown as TestNode
   act(() => renderer!.unmount())
@@ -71,7 +71,6 @@ describe('MobileMarkdown selection', () => {
     ['heading', 'Heading prose'],
     ['quote', 'Quote prose'],
     ['code', 'const code = 1'],
-    ['code language', 'TS'],
     ['list item', 'List item prose'],
     ['table header', 'Head A'],
     ['table cell', 'Cell A']

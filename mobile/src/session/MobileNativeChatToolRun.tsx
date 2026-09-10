@@ -1,6 +1,5 @@
-import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { useEffect, useRef, useState } from 'react'
-import { Animated, Pressable, View } from 'react-native'
+import { Animated, Pressable, Text, View } from 'react-native'
 import { ChevronDown, SquareChevronRight, SquareTerminal, Wrench } from 'lucide-react-native'
 import { diffFromText, diffFromToolCall } from '../../../src/shared/native-chat-diff'
 import type { NativeChatDiffLine as DiffLine } from '../../../src/shared/native-chat-diff'
@@ -31,7 +30,6 @@ function DiffView({ lines }: { lines: DiffLine[] }): React.JSX.Element {
       {lines.map((line, i) => (
         <Text
           key={i}
-          selectable
           style={[
             styles.diffLine,
             line.kind === 'add' && styles.diffAdd,
@@ -64,9 +62,7 @@ function ResultBody({
   }
   return (
     <View style={[styles.toolResult, isError && styles.toolResultError]}>
-      <Text selectable style={styles.mono}>
-        {truncateToolDetail(output)}
-      </Text>
+      <Text style={styles.mono}>{truncateToolDetail(output)}</Text>
     </View>
   )
 }
@@ -130,11 +126,7 @@ function ToolLine({
       {showDetail ? (
         <View style={styles.toolDetail}>
           {callDiff ? <DiffView lines={callDiff} /> : null}
-          {callDetail ? (
-            <Text selectable style={styles.mono}>
-              {callDetail}
-            </Text>
-          ) : null}
+          {callDetail ? <Text style={styles.mono}>{callDetail}</Text> : null}
           {result ? (
             <ResultBody output={result.output} isError={result.isError} diff={resultDiff} />
           ) : null}

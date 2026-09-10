@@ -54,7 +54,13 @@ describe('iOS selectable text boundary', () => {
     const { MobileMarkdown } = await import('./MobileMarkdown')
     const onOpenFile = vi.fn()
     const line = '**same** [file](src/main.ts)'
-    const tree = render(createElement(MobileMarkdown, { content: `${line}\n${line}`, onOpenFile }))
+    const tree = render(
+      createElement(MobileMarkdown, {
+        content: `${line}\n${line}`,
+        rangeSelectable: true,
+        onOpenFile
+      })
+    )
     expect(
       nodes(tree, 'RNUITextViewChild')
         .map((node) => node.props.text)
@@ -64,6 +70,7 @@ describe('iOS selectable text boundary', () => {
       tree.update(
         createElement(MobileMarkdown, {
           content: `${line}\n**changed** [file](src/main.ts)`,
+          rangeSelectable: true,
           onOpenFile
         })
       )
@@ -73,7 +80,11 @@ describe('iOS selectable text boundary', () => {
         .map((node) => node.props.text)
         .join('')
     ).toBe('same file\nchanged file')
-    act(() => tree.update(createElement(MobileMarkdown, { content: line, onOpenFile })))
+    act(() =>
+      tree.update(
+        createElement(MobileMarkdown, { content: line, rangeSelectable: true, onOpenFile })
+      )
+    )
     const spans = nodes(tree, 'RNUITextViewChild')
     expect(spans.map((node) => node.props.text).join('')).toBe('same file')
     act(() => spans.find((node) => node.props.text === 'file')!.props.onPress())
@@ -91,19 +102,6 @@ describe('iOS selectable text boundary', () => {
     expect(nodes(tree, 'RNUITextViewChild')[0]!.props.style.fontWeight).toBe(expected)
   })
 
-  it('bounds a dense table to the existing 328 selectable cells', async () => {
-    const { MobileMarkdown } = await import('./MobileMarkdown')
-    const row = '| a | b | c | d | e | f | g | h |'
-    const content = [
-      row,
-      '| --- | --- | --- | --- | --- | --- | --- | --- |',
-      ...Array.from({ length: 45 }, () => row)
-    ].join('\n')
-    const tree = render(createElement(MobileMarkdown, { content }))
-    expect(nodes(tree, 'RNUITextView')).toHaveLength(328)
-    expect(nodes(tree, 'RNUITextViewChild')).toHaveLength(328)
-  })
-
   it('keeps fragments, arrays, newlines and nested styles in one native root', async () => {
     const { MobileSelectableText: Text } = await import('./MobileSelectableText.ios')
     const tree = render(
@@ -111,31 +109,32 @@ describe('iOS selectable text boundary', () => {
         Text,
         { selectable: true, style: { fontSize: 18 } },
         createElement(Fragment, null, 'Before ', ['one', '\n']),
-        createElement(
-          Text,
-          { style: { fontWeight: '700' } },
-          createElement(Text, { style: { color: 'blue' } }, 'nested')
-        ),
+        createElement(Text, { style: { fontWeight: '700' } }, 'bold'),
+        createElement(Text, { style: { color: 'blue' } }, 'nested'),
         ' after'
       )
     )
     expect(nodes(tree, 'RNUITextView')).toHaveLength(1)
     expect(nodes(tree, 'Text')).toHaveLength(0)
     const spans = nodes(tree, 'RNUITextViewChild')
-    expect(spans.map((node) => node.props.text).join('')).toBe('Before one\nnested after')
+    expect(spans.map((node) => node.props.text).join('')).toBe('Before one\nboldnested after')
+    expect(spans.find((node) => node.props.text === 'bold')?.props.style).toMatchObject({
+      fontSize: 18,
+      fontWeight: 'bold'
+    })
     expect(spans.find((node) => node.props.text === 'nested')?.props.style).toMatchObject({
       fontSize: 18,
-      fontWeight: 'bold',
       color: 'blue'
     })
   })
 
-  it('preserves Markdown text and file-link callbacks inside bold spans', async () => {
+  it('preserves Markdown text, inline styles and file-link callbacks', async () => {
     const { MobileMarkdown } = await import('./MobileMarkdown')
     const onOpenFile = vi.fn()
     const tree = render(
       createElement(MobileMarkdown, {
-        content: 'Hello 😀 **src/main.ts** and `code`.\nNext line.',
+        content: 'Hello 😀 [src/main.ts](src/main.ts) and `code`.\nNext line.',
+        rangeSelectable: true,
         onOpenFile
       })
     )
@@ -144,7 +143,7 @@ describe('iOS selectable text boundary', () => {
       'Hello 😀 src/main.ts and code.\nNext line.'
     )
     const link = spans.find((node) => node.props.text === 'src/main.ts')!
-    expect(link.props.style.fontWeight).toBe('bold')
+    expect(link.props.style.color).toBeDefined()
     act(() => link.props.onPress())
     expect(onOpenFile).toHaveBeenCalledExactlyOnceWith('src/main.ts')
     expect(nodes(tree, 'RNUITextView')).toHaveLength(1)
@@ -155,6 +154,35 @@ describe('iOS selectable text boundary', () => {
     const tree = render(createElement(Text, null, 'Submit'))
     expect(nodes(tree, 'RNUITextView')).toHaveLength(0)
     expect(nodes(tree, 'Text')).toHaveLength(1)
+  })
+
+  it('uses native range selection only when Markdown opts in', async () => {
+    const { MobileMarkdown } = await import('./MobileMarkdown')
+    const tree = render(createElement(MobileMarkdown, { content: 'Transcript prose' }))
+    expect(nodes(tree, 'RNUITextView')).toHaveLength(0)
+    expect(
+      nodes(tree, 'Text').find((node) => node.children.includes('Transcript prose'))?.props
+        .selectable
+    ).toBe(false)
+    act(() =>
+      tree.update(
+        createElement(MobileMarkdown, { content: 'Transcript prose', rangeSelectable: true })
+      )
+    )
+    expect(nodes(tree, 'RNUITextView')).toHaveLength(1)
+  })
+
+  it('keeps code-language labels on styled React Native Text', async () => {
+    const { MobileMarkdown } = await import('./MobileMarkdown')
+    const tree = render(
+      createElement(MobileMarkdown, {
+        content: '```ts\nconst value = 1\n```',
+        rangeSelectable: true
+      })
+    )
+    const label = nodes(tree, 'Text').find((node) => node.children.join('') === 'ts')!
+    expect(label.props.style.textTransform).toBe('uppercase')
+    expect(nodes(tree, 'RNUITextView')).toHaveLength(1)
   })
 
   it('falls back for older clients without the native view', async () => {

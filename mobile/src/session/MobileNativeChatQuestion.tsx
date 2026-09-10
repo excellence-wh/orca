@@ -1,6 +1,5 @@
-import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { ArrowUp, Check, CircleHelp } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import {
@@ -102,9 +101,7 @@ export function MobileNativeChatQuestion({ question, onAnswer }: Props): React.J
     <View style={styles.card}>
       <View style={styles.header}>
         <CircleHelp size={15} color={colors.accentBlue} strokeWidth={2.2} />
-        <Text selectable style={styles.question}>
-          {question.question}
-        </Text>
+        <Text style={styles.question}>{question.question}</Text>
       </View>
 
       {hasOptions ? (

@@ -1,6 +1,6 @@
 import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { memo } from 'react'
-import { Image, View } from 'react-native'
+import { Image, Text as NativeText, View } from 'react-native'
 import { splitNativeChatBlocks } from '../../../src/shared/native-chat-tool-fold'
 import { selectActiveToolCall } from '../../../src/shared/native-chat-tool-activity'
 import { isImageRefBlock, isTextBlock } from '../../../src/shared/native-chat-types'
@@ -34,7 +34,12 @@ function Prose({
       )
     }
     return (
-      <MobileMarkdown content={block.text} textScale={1.25 * fontScale} onOpenFile={onOpenFile} />
+      <MobileMarkdown
+        content={block.text}
+        rangeSelectable
+        textScale={1.25 * fontScale}
+        onOpenFile={onOpenFile}
+      />
     )
   }
   if (isImageRefBlock(block)) {
@@ -52,9 +57,9 @@ function Prose({
       )
     }
     return (
-      <Text selectable style={[styles.imageRef, { fontSize: TEXT_SIZE * fontScale }]}>
+      <NativeText style={[styles.imageRef, { fontSize: TEXT_SIZE * fontScale }]}>
         🖼 {block.alt ?? block.path ?? block.url ?? 'image'}
-      </Text>
+      </NativeText>
     )
   }
   return null

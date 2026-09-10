@@ -1,4 +1,3 @@
-import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -6,6 +5,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
+  Text,
   View
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -15,7 +15,6 @@ import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-c
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { colors } from '../theme/mobile-theme'
 import { styles } from './mobile-native-chat-view-styles'
-import { MobileNativeChatEmptyState } from './MobileNativeChatEmptyState'
 import {
   buildMobileNativeChatTransientData,
   mobileNativeChatEmptyState,
@@ -342,12 +341,16 @@ export function MobileNativeChatView({
                 ) : null
               }
               ListEmptyComponent={
-                emptyState ? <MobileNativeChatEmptyState copy={emptyState} /> : null
+                emptyState ? (
+                  <View style={styles.center}>
+                    <Text style={styles.emptyTitle}>{emptyState.title}</Text>
+                    <Text style={styles.emptySubtitle}>{emptyState.subtitle}</Text>
+                  </View>
+                ) : null
               }
             />
           </GestureDetector>
-          {/* Jump-to-latest control. The scroll-to-top affordance now lives
-              per-message (the up-arrow in each agent message's controls). */}
+          {/* Jump-to-latest control. */}
           {!atBottom ? (
             <Pressable
               accessibilityLabel="Scroll to latest"
@@ -407,9 +410,7 @@ export function MobileNativeChatView({
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
         >
-          <Text selectable style={styles.sendErrorText}>
-            {sendErrorMessage}
-          </Text>
+          <Text style={styles.sendErrorText}>{sendErrorMessage}</Text>
         </View>
       ) : null}
       <MobileNativeChatComposer

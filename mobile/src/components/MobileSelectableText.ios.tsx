@@ -1,18 +1,9 @@
-import {
-  Children,
-  Fragment,
-  createContext,
-  isValidElement,
-  useContext,
-  useMemo,
-  type ReactNode
-} from 'react'
-import { StyleSheet, Text, UIManager, type TextProps, type TextStyle } from 'react-native'
+import { Children, Fragment, isValidElement, type ReactNode } from 'react'
+import { StyleSheet, Text, UIManager, type TextProps } from 'react-native'
 import { UITextView } from 'react-native-uitextview'
 
 // Older development clients can load this bundle before rebuilding their native views.
 const hasRangeSelection = UIManager.hasViewManagerConfig('RNUITextView')
-const NativeTextStyle = createContext<TextStyle | null>(null)
 
 function flattenFragments(children: ReactNode): ReactNode[] {
   return (
@@ -25,12 +16,7 @@ function flattenFragments(children: ReactNode): ReactNode[] {
 }
 
 export function MobileSelectableText({ children, style, ...props }: TextProps): React.JSX.Element {
-  const inheritedStyle = useContext(NativeTextStyle)
-  const textStyle = useMemo(
-    () => StyleSheet.flatten([inheritedStyle, style]) ?? {},
-    [inheritedStyle, style]
-  )
-  if (!hasRangeSelection || (!props.selectable && inheritedStyle === null)) {
+  if (!hasRangeSelection) {
     return (
       <Text {...props} style={style}>
         {children}
@@ -39,15 +25,14 @@ export function MobileSelectableText({ children, style, ...props }: TextProps): 
   }
 
   // The native span adapter otherwise maps numeric bold to semibold.
+  const textStyle = StyleSheet.flatten(style)
   const nativeStyle =
-    textStyle.fontWeight === '700' || textStyle.fontWeight === 700
+    textStyle?.fontWeight === '700' || textStyle?.fontWeight === 700
       ? { ...textStyle, fontWeight: 'bold' as const }
-      : textStyle
+      : style
   return (
-    <NativeTextStyle.Provider value={textStyle}>
-      <UITextView {...props} uiTextView selectable style={nativeStyle}>
-        {flattenFragments(children)}
-      </UITextView>
-    </NativeTextStyle.Provider>
+    <UITextView {...props} uiTextView style={nativeStyle}>
+      {flattenFragments(children)}
+    </UITextView>
   )
 }

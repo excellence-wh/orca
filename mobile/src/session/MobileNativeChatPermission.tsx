@@ -1,6 +1,5 @@
-import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { memo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ShieldQuestion } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { MobileChatPermission } from './mobile-native-chat-permission'
@@ -33,15 +32,9 @@ function MobileNativeChatPermissionImpl({
     <View style={styles.card}>
       <View style={styles.header}>
         <ShieldQuestion size={16} color={colors.accentBlue} strokeWidth={2} />
-        <Text selectable style={styles.title}>
-          {permission.title}
-        </Text>
+        <Text style={styles.title}>{permission.title}</Text>
       </View>
-      {permission.detail ? (
-        <Text selectable style={styles.detail}>
-          {permission.detail}
-        </Text>
-      ) : null}
+      {permission.detail ? <Text style={styles.detail}>{permission.detail}</Text> : null}
       <View style={styles.options}>
         {permission.options.map((option, index) => {
           const isPrimary = index === 0

@@ -1,6 +1,5 @@
-import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
@@ -127,9 +126,7 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
       ) : null}
 
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="always">
-        <Text selectable style={styles.questionText}>
-          {q.question}
-        </Text>
+        <Text style={styles.questionText}>{q.question}</Text>
         {q.options.map((opt, optIndex) => (
           <OptionRow
             key={`${optIndex}:${opt.label}`}
