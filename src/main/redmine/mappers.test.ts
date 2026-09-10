@@ -27,7 +27,7 @@ describe('redmine mappers', () => {
           { id: 45, name: 'AI usage', value: '90' }
         ]
       },
-      'http://redmine.example.com/'
+      'https://redmine.example.com/'
     )
 
     expect(issue.id).toBe(106927)
@@ -46,7 +46,7 @@ describe('redmine mappers', () => {
       { id: 29, name: 'PIC', value: '654' },
       { id: 45, name: 'AI usage', value: '90' }
     ])
-    expect(issue.url).toBe('http://redmine.example.com/issues/106927')
+    expect(issue.url).toBe('https://redmine.example.com/issues/106927')
   })
 
   it('marks a closed status and strips trailing slash from the site URL', () => {
@@ -71,7 +71,7 @@ describe('redmine mappers', () => {
   })
 
   it('tolerates missing optional fields', () => {
-    const issue = mapRedmineIssue({ id: 7, subject: 'Bare' }, 'http://r.example')
+    const issue = mapRedmineIssue({ id: 7, subject: 'Bare' }, 'https://r.example')
     expect(issue.project.name).toBe('')
     expect(issue.assignedTo).toBeNull()
     expect(issue.description).toBeNull()

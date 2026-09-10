@@ -20,6 +20,7 @@ import {
 } from './client'
 import type { RedmineReadError, RedmineSite } from '../../shared/redmine-types'
 import type { RedmineSiteFile } from './redmine-site-store'
+import { CredentialDecryptionError } from '../integration-credential-file'
 
 vi.mock('./redmine-request', () => ({
   classifyRedmineError: vi.fn(),
@@ -153,6 +154,21 @@ describe('getRedmineStatus', () => {
     const status = getRedmineStatus()
     expect(status.connected).toBe(true)
     expect(status.error).toEqual({ type: 'decryption', message: 'cannot decrypt' })
+  })
+
+  it('detects a corrupt token on the first status call (before any readToken attempt)', () => {
+    getSiteFileMock.mockReturnValue({
+      ...emptyFile(),
+      activeSiteId: 'site-a',
+      selectedSiteId: 'site-a',
+      sites: [aSite('site-a', 'https://a.example.com')]
+    })
+    credentialErrorsGetMock.mockReturnValue(undefined)
+    readTokenMock.mockImplementation(() => {
+      throw new CredentialDecryptionError('Redmine')
+    })
+    const status = getRedmineStatus()
+    expect(status.error?.type).toBe('decryption')
   })
 })
 

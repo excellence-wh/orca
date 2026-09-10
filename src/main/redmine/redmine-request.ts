@@ -65,7 +65,22 @@ async function readRedmineError(response: Response): Promise<string> {
 }
 
 export function normalizeRedmineUrl(value: string): string {
-  return value.trim().replace(/\/+$/, '')
+  const normalized = value.trim().replace(/\/+$/, '')
+  // Why: the API key travels cleartext, so require HTTPS for any non-loopback
+  // host. Local self-hosted setups (localhost / 127.0.0.1 / ::1) stay usable.
+  const url = new URL(normalized)
+  if (url.protocol === 'http:' && !isLoopbackHostname(url.hostname)) {
+    throw new RedmineApiError('Redmine servers must use HTTPS, except on loopback.')
+  }
+  return normalized
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase()
+  if (host === 'localhost' || host === '[::1]' || host === '::1' || host.endsWith('.localhost')) {
+    return true
+  }
+  return /^127(\.\d{1,3}){3}$/.test(host)
 }
 
 export async function redmineRequest<T>(

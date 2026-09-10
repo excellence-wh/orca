@@ -117,6 +117,18 @@ export function getRedmineStatus(): RedmineConnectionStatus {
 
   let error: RedmineConnectionStatus['error'] | null = null
   if (activeSite) {
+    // Why: hasStoredToken only checks file content, so probe decryption once
+    // here — otherwise a corrupt key reports connected:true with no error on
+    // the first status call after startup.
+    try {
+      readToken(activeSite.id)
+    } catch (cause) {
+      if (cause instanceof CredentialDecryptionError) {
+        error = { type: 'decryption', message: 'Stored Redmine API key could not be decrypted.' }
+      } else {
+        throw cause
+      }
+    }
     const credentialError = credentialErrors.get(activeSite.id)
     if (credentialError) {
       error = { type: 'decryption', message: credentialError }

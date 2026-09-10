@@ -118,11 +118,17 @@ export function TaskPageRedmineContent({
 
   useEffect(() => {
     if (!connected) {
+      // Why: drop stale list/detail/error so a reconnect to a different site
+      // never shows the previous site's issues.
+      setIssues([])
+      setSelected(null)
+      setError(null)
       setLoading(false)
       return
     }
     let cancelled = false
     setLoading(true)
+    setError(null)
     void listRedmineIssues({ scope: 'assigned' })
       .then((result) => {
         if (cancelled) {
