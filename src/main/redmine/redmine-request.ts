@@ -16,6 +16,7 @@ export class RedmineApiError extends Error {
 // so route requests through Electron's net.fetch (Chromium proxy/session state)
 // exactly like Jira, not through undici's stale-socket fetch.
 const REDMINE_API_USER_AGENT = 'Orca'
+const REDMINE_MAX_REDIRECTS = 5
 
 async function redmineFetch(url: string, init: RequestInit): Promise<Response> {
   return withSpan(
@@ -33,10 +34,36 @@ async function redmineFetch(url: string, init: RequestInit): Promise<Response> {
           errorMessage: error instanceof Error ? error.message : String(error)
         })
       })
-      return httpClient.fetch(url, init)
+      return redirectGuardedFetch(httpClient, url, init)
     },
     { kind: 'client' }
   )
+}
+
+// Why: follow redirects manually and validate every hop, so a redirect to a
+// cleartext host can never receive the X-Redmine-API-Key header. Chromium's
+// automatic redirect handling re-sends custom headers without target checks.
+async function redirectGuardedFetch(
+  httpClient: { fetch: (url: string, init: RequestInit) => Promise<Response> },
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  let current = url
+  for (let hop = 0; hop < REDMINE_MAX_REDIRECTS; hop++) {
+    assertSecureOrLoopbackUrl(current)
+    const response = await httpClient.fetch(current, { ...init, redirect: 'manual' })
+    const status = response.status
+    if (status >= 300 && status < 400) {
+      const location = response.headers.get('location')
+      if (!location) {
+        return response
+      }
+      current = new URL(location, current).toString()
+      continue
+    }
+    return response
+  }
+  throw new RedmineApiError(`Too many redirects while contacting ${url}`)
 }
 
 function buildHeaders(apiKey: string, init?: RequestInit): Headers {
@@ -65,13 +92,13 @@ async function readRedmineError(response: Response): Promise<string> {
 }
 
 export function normalizeRedmineUrl(value: string): string {
-  const normalized = value.trim().replace(/\/+$/, '')
-  // Why: the API key travels cleartext, so require HTTPS for any non-loopback
-  // host. Local self-hosted setups (localhost / 127.0.0.1 / ::1) stay usable.
-  const url = new URL(normalized)
-  if (url.protocol === 'http:' && !isLoopbackHostname(url.hostname)) {
-    throw new RedmineApiError('Redmine servers must use HTTPS, except on loopback.')
+  let normalized = value.trim().replace(/\/+$/, '')
+  // Why: schema-less input is common for self-hosted Redmine (like Jira's
+  // normalizeJiraSiteUrl); default it to https rather than failing URL parse.
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
+    normalized = `https://${normalized}`
   }
+  assertSecureOrLoopbackUrl(normalized)
   return normalized
 }
 
@@ -81,6 +108,17 @@ function isLoopbackHostname(hostname: string): boolean {
     return true
   }
   return /^127(\.\d{1,3}){3}$/.test(host)
+}
+
+// Why: the API key travels cleartext, so require HTTPS for any non-loopback
+// host (loopback local self-hosted setups stay usable). Shared by the URL
+// normalizer and the redirect guard so a request can never send the key to a
+// plaintext target.
+export function assertSecureOrLoopbackUrl(urlString: string): void {
+  const url = new URL(urlString)
+  if (url.protocol === 'http:' && !isLoopbackHostname(url.hostname)) {
+    throw new RedmineApiError('Redmine servers must use HTTPS, except on loopback.')
+  }
 }
 
 export async function redmineRequest<T>(
