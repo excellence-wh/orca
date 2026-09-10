@@ -7,7 +7,11 @@ import {
   writeEncryptedCredential
 } from '../integration-credential-file'
 import type { RedmineSite, RedmineSiteSelection } from '../../shared/redmine-types'
-import { getRedmineSiteFilePath, getRedmineTokenPath } from './redmine-credential-paths'
+import {
+  getRedmineSiteFilePath,
+  getRedmineTokenDir,
+  getRedmineTokenPath
+} from './redmine-credential-paths'
 
 export type RedmineSiteFile = {
   version: 1
@@ -150,6 +154,10 @@ export function readToken(siteId: string): string | null {
 
 export function saveToken(siteId: string, apiToken: string): void {
   ensureOrcaDir()
+  const tokenDir = getRedmineTokenDir()
+  if (!existsSync(tokenDir)) {
+    mkdirSync(tokenDir, { recursive: true })
+  }
   writeEncryptedCredential('Redmine', getRedmineTokenPath(siteId), apiToken)
   cachedTokens.set(siteId, apiToken)
   credentialErrors.delete(siteId)
