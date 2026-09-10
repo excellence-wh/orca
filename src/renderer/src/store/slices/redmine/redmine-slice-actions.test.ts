@@ -75,7 +75,12 @@ beforeEach(() => {
   install()
 })
 
-const site = { id: 'https://rm.example.com', siteUrl: 'https://rm.example.com', displayName: 'rm', hasToken: true }
+const site = {
+  id: 'https://rm.example.com',
+  siteUrl: 'https://rm.example.com',
+  displayName: 'rm',
+  hasToken: true
+}
 
 describe('checkRedmineConnection', () => {
   it('probes once and records the checked flag', async () => {
@@ -110,7 +115,11 @@ describe('checkRedmineConnection', () => {
 
 describe('connectRedmine', () => {
   it('persists status and clears caches on success', async () => {
-    redmineConnectMock.mockResolvedValue({ ok: true, site, viewer: { id: 1, name: 'Ada', login: 'ada' } })
+    redmineConnectMock.mockResolvedValue({
+      ok: true,
+      site,
+      viewer: { id: 1, name: 'Ada', login: 'ada' }
+    })
     redmineStatusMock.mockResolvedValue({ ...emptyStatus(), connected: true, activeSite: site })
     set({ redmineListCache: { k: { data: { items: [], totalCount: 0 }, fetchedAt: Date.now() } } })
 
