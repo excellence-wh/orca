@@ -381,9 +381,26 @@ function makeOrchestrationDbStub(toHandle: () => string) {
     }
     clearMailboxPointerEnter(pendingIds)
   })
+  const reservationsFor = (ptyId?: string) =>
+    rows
+      .filter(
+        (row) =>
+          row.pointer_enter_pending > 0 && (ptyId === undefined || row.pointer_pty_id === ptyId)
+      )
+      .map((row) => ({
+        id: row.id,
+        pointer_pty_id: row.pointer_pty_id as string,
+        pointer_process_incarnation: row.pointer_process_incarnation as string,
+        pointer_enter_pending: row.pointer_enter_pending,
+        to_handle: row.to_handle
+      }))
+  const getMailboxPointerReservations = vi.fn(() => reservationsFor())
+  const getMailboxPointerReservationsForPty = vi.fn((ptyId: string) => reservationsFor(ptyId))
   return {
     rows,
     runMailbox,
+    releaseMailboxPointerEnter,
+    settleMailboxPointerEnter,
     markAsDelivered,
     markAsUndelivered,
     stageMailboxPointerEnter,
@@ -452,6 +469,10 @@ function makeOrchestrationDbStub(toHandle: () => string) {
         ),
       // Consulted by onPtyExit's dispatch-failure path.
       getActiveDispatchForTerminal: () => null,
+      // Recovery fences on connection identity; the real OrchestrationDb exposes `.db`.
+      db: { connection: 'stub' },
+      getMailboxPointerReservations,
+      getMailboxPointerReservationsForPty,
       stageMailboxPointerEnter,
       markMailboxPointerWriteAttempted,
       markMailboxPointerEnterAttempted,
@@ -759,7 +780,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(0)
       expect(stub.stageMailboxPointerEnter).toHaveBeenCalledOnce()
-      expect(stub.markAsUndelivered).toHaveBeenCalledOnce()
+      expect(stub.releaseMailboxPointerEnter).toHaveBeenCalledOnce()
       expect(stub.rows[0].delivered_at).toBeNull()
 
       // The replacement's own delivery starts a fresh flight and completes —
@@ -804,7 +825,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(0)
       expect(stub.stageMailboxPointerEnter).toHaveBeenCalledOnce()
-      expect(stub.markAsUndelivered).toHaveBeenCalledOnce()
+      expect(stub.releaseMailboxPointerEnter).toHaveBeenCalledOnce()
       // No stray settle flushed the parked trigger into the dead pty.
       expect(write).toHaveBeenCalledTimes(1)
       expect(stub.rows.every((row) => row.delivered_at === null)).toBe(true)
@@ -835,7 +856,7 @@ describe('push-on-idle orchestration delivery absence gate', () => {
       await vi.advanceTimersByTimeAsync(500)
       expect(write.mock.calls.filter(([, data]) => data === '\r')).toHaveLength(0)
       expect(stub.stageMailboxPointerEnter).toHaveBeenCalledOnce()
-      expect(stub.markAsUndelivered).toHaveBeenCalledOnce()
+      expect(stub.releaseMailboxPointerEnter).toHaveBeenCalledOnce()
       expect(stub.rows[0].delivered_at).toBeNull()
     } finally {
       vi.useRealTimers()
