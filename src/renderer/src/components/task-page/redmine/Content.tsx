@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ListTodo } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { RedmineIcon } from '@/components/icons/RedmineIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,7 +43,7 @@ function ConnectPrompt() {
 
   return (
     <div className="mt-4 flex flex-col items-center justify-center rounded-md border border-border/50 bg-muted/50 px-6 py-10 text-center shadow-sm">
-      <ListTodo className="mb-4 size-8 text-muted-foreground/60" />
+      <RedmineIcon className="mb-4 size-8 text-muted-foreground/60" />
       <p className="text-base font-medium text-foreground">
         {translate('auto.components.TaskPage.redmineConnectTitle', 'Connect your Redmine server')}
       </p>

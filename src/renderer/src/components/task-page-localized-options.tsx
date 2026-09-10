@@ -1,7 +1,8 @@
 import React from 'react'
-import { Github, Gitlab, LayoutGrid, List, ListTodo } from 'lucide-react'
+import { Github, Gitlab, LayoutGrid, List } from 'lucide-react'
 
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import { RedmineIcon } from '@/components/icons/RedmineIcon'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { translate } from '@/i18n/i18n'
 import {
@@ -135,7 +136,7 @@ export const getSourceOptions = createLocalizedCatalog((): SourceOption[] => [
   {
     id: 'redmine',
     label: translate('auto.components.TaskPage.redmineLabel', 'Redmine'),
-    Icon: ({ className }) => <ListTodo className={className} />
+    Icon: ({ className }) => <RedmineIcon className={className} />
   }
 ])
 
