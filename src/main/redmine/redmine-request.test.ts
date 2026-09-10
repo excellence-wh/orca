@@ -96,6 +96,17 @@ describe('redmineRequest redirect guard', () => {
     )
     expect(httpFetch).toHaveBeenCalledTimes(2)
   })
+
+  it('rejects a cross-origin https redirect before forwarding the API key', async () => {
+    httpFetch.mockResolvedValueOnce(
+      stubResponse({ status: 302, location: 'https://evil.example.com/steal' })
+    )
+    await expect(redmineRequest('https://good.example.com', 'k', '/issues.json')).rejects.toThrow(
+      RedmineApiError
+    )
+    // Never forwarded the key to the other origin.
+    expect(httpFetch).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('classifyRedmineError', () => {

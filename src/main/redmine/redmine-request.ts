@@ -48,6 +48,7 @@ async function redirectGuardedFetch(
   url: string,
   init: RequestInit
 ): Promise<Response> {
+  const initialOrigin = new URL(url).origin
   let current = url
   for (let hop = 0; hop < REDMINE_MAX_REDIRECTS; hop++) {
     assertSecureOrLoopbackUrl(current)
@@ -58,7 +59,13 @@ async function redirectGuardedFetch(
       if (!location) {
         return response
       }
-      current = new URL(location, current).toString()
+      const next = new URL(location, current).toString()
+      // Why: the API key is scoped to the configured site, so never forward it
+      // to a different origin even over https.
+      if (new URL(next).origin !== initialOrigin) {
+        throw new RedmineApiError(`Refusing to follow a redirect to a different origin: ${next}`)
+      }
+      current = next
       continue
     }
     return response
