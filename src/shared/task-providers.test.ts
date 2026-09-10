@@ -71,7 +71,7 @@ describe('task providers', () => {
           gitlabInstalled: false,
           linearConnected: true,
           redmineConnected: false
-          },
+        },
         'github'
       )
     ).toEqual(['github', 'linear'])
@@ -85,7 +85,7 @@ describe('task providers', () => {
           gitlabInstalled: false,
           linearConnected: true,
           redmineConnected: false
-          },
+        },
         'linear'
       )
     ).toEqual(['linear'])
@@ -99,7 +99,7 @@ describe('task providers', () => {
           gitlabInstalled: false,
           linearConnected: true,
           redmineConnected: false
-          },
+        },
         'gitlab'
       )
     ).toEqual(['linear'])
@@ -113,7 +113,7 @@ describe('task providers', () => {
           gitlabInstalled: false,
           linearConnected: true,
           redmineConnected: false
-          },
+        },
         'bitbucket'
       )
     ).toEqual(['github'])

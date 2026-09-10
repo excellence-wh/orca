@@ -254,7 +254,13 @@ function getAutomationSourceAvailability(
 
 function getAutomationSourceProviderLabel(provider: TaskSourceContext['provider']): string {
   return (
-    { github: 'GitHub', gitlab: 'GitLab', linear: 'Linear', jira: 'Jira', redmine: 'Redmine' } as const
+    {
+      github: 'GitHub',
+      gitlab: 'GitLab',
+      linear: 'Linear',
+      jira: 'Jira',
+      redmine: 'Redmine'
+    } as const
   )[provider]
 }
 

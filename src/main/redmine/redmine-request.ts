@@ -65,9 +65,7 @@ async function readRedmineError(response: Response): Promise<string> {
 }
 
 export function normalizeRedmineUrl(value: string): string {
-  return value
-    .trim()
-    .replace(/\/+$/, '')
+  return value.trim().replace(/\/+$/, '')
 }
 
 export async function redmineRequest<T>(

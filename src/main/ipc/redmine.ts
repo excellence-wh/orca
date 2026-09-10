@@ -14,7 +14,10 @@ export function registerRedmineHandlers(): void {
     const siteUrl = typeof args?.siteUrl === 'string' ? args.siteUrl.trim() : ''
     const apiKey = typeof args?.apiKey === 'string' ? args.apiKey.trim() : ''
     if (!siteUrl || !apiKey) {
-      return { ok: false, error: { type: 'unknown', message: 'Server URL and API key are required.' } }
+      return {
+        ok: false,
+        error: { type: 'unknown', message: 'Server URL and API key are required.' }
+      }
     }
     const result = await connectRedmineSite(siteUrl, apiKey)
     if (!result.ok) {
@@ -39,7 +42,10 @@ export function registerRedmineHandlers(): void {
       const siteUrl = typeof args?.siteUrl === 'string' ? args.siteUrl.trim() : ''
       const apiKey = typeof args?.apiKey === 'string' ? args.apiKey.trim() : ''
       if (!siteUrl || !apiKey) {
-        return { ok: false, error: { type: 'unknown', message: 'Server URL and API key are required.' } }
+        return {
+          ok: false,
+          error: { type: 'unknown', message: 'Server URL and API key are required.' }
+        }
       }
       const result = await testRedmineConnection(siteUrl, apiKey)
       if (!result.user || result.error) {
@@ -55,7 +61,11 @@ export function registerRedmineHandlers(): void {
   ipcMain.handle('redmine:listIssues', async (_event, args?: { filter?: RedmineListFilter }) => {
     const creds = activeCredentials()
     if (!creds) {
-      return { items: [], totalCount: 0, error: { type: 'auth', message: 'No Redmine site connected.' } }
+      return {
+        items: [],
+        totalCount: 0,
+        error: { type: 'auth', message: 'No Redmine site connected.' }
+      }
     }
     return listRedmineIssues(creds.siteUrl, creds.apiKey, args?.filter ?? {})
   })

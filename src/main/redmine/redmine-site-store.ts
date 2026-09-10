@@ -110,8 +110,7 @@ export function writeSiteFile(file: RedmineSiteFile): void {
       ? file.activeSiteId
       : (sites[0]?.id ?? null)
   const selectedSiteId =
-    typeof file.selectedSiteId === 'string' &&
-    sites.some((site) => site.id === file.selectedSiteId)
+    typeof file.selectedSiteId === 'string' && sites.some((site) => site.id === file.selectedSiteId)
       ? file.selectedSiteId
       : activeSiteId
 

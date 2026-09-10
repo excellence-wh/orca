@@ -13,8 +13,7 @@ export const redmineApi = {
   testConnection: (args: { siteUrl: string; apiKey: string }) =>
     ipcRenderer.invoke('redmine:testConnection', args),
 
-  listIssues: (args?: { filter?: unknown }) =>
-    ipcRenderer.invoke('redmine:listIssues', args),
+  listIssues: (args?: { filter?: unknown }) => ipcRenderer.invoke('redmine:listIssues', args),
 
   getIssue: (args: { issueId: number }) => ipcRenderer.invoke('redmine:getIssue', args)
 } satisfies PreloadApi['redmine']

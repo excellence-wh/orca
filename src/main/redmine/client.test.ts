@@ -1,8 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import {
-  classifyRedmineError,
-  redmineRequest
-} from './redmine-request'
+import { classifyRedmineError, redmineRequest } from './redmine-request'
 import {
   credentialErrors,
   deleteToken,
@@ -82,9 +79,7 @@ beforeEach(() => {
 
 describe('redmineSiteIdForUrl', () => {
   it('derives the site id from the normalized URL', () => {
-    expect(redmineSiteIdForUrl('https://redmine.example.com/')).toBe(
-      'https://redmine.example.com'
-    )
+    expect(redmineSiteIdForUrl('https://redmine.example.com/')).toBe('https://redmine.example.com')
   })
 })
 
@@ -116,7 +111,9 @@ describe('testRedmineConnection', () => {
 
 describe('connectRedmineSite', () => {
   it('persists the token and writes a site entry on success', async () => {
-    redmineRequestMock.mockResolvedValue({ user: { id: 1, firstname: 'Grace', lastname: 'Hopper' } })
+    redmineRequestMock.mockResolvedValue({
+      user: { id: 1, firstname: 'Grace', lastname: 'Hopper' }
+    })
     const result = await connectRedmineSite('https://redmine.example.com/', 'secret')
     expect(result.ok).toBe(true)
     expect(saveTokenMock).toHaveBeenCalledWith('https://redmine.example.com', 'secret')

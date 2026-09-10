@@ -3,16 +3,8 @@ import type {
   RedmineIssueCollectionResult,
   RedmineListFilter
 } from '../../shared/redmine-types'
-import {
-  classifyRedmineError,
-  redmineRequest,
-  type RedmineApiError
-} from './redmine-request'
-import {
-  mapRedmineIssue,
-  type RawRedmineIssueDetail,
-  type RawRedmineIssueList
-} from './mappers'
+import { classifyRedmineError, redmineRequest, type RedmineApiError } from './redmine-request'
+import { mapRedmineIssue, type RawRedmineIssueDetail, type RawRedmineIssueList } from './mappers'
 
 const LIST_REQUEST_TIMEOUT_MS = 8000
 const DETAIL_REQUEST_TIMEOUT_MS = 8000

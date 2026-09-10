@@ -89,7 +89,10 @@ export function createRedmineActions(
         }
       }
       if (result.ok && getProviderRuntimeContextKey(get().settings) !== contextKey) {
-        return { ok: false as const, error: { type: 'unknown', message: 'Connection superseded by a newer request.' } }
+        return {
+          ok: false as const,
+          error: { type: 'unknown', message: 'Connection superseded by a newer request.' }
+        }
       }
       return result as RedmineFetchResult
     },

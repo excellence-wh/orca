@@ -85,7 +85,11 @@ describe('redmine mappers', () => {
       identifier: 'portal'
     })
     expect(mapRedmineProject(undefined)).toBeNull()
-    expect(mapRedmineUser({ id: 5, name: 'N', login: 'n' })).toEqual({ id: 5, name: 'N', login: 'n' })
+    expect(mapRedmineUser({ id: 5, name: 'N', login: 'n' })).toEqual({
+      id: 5,
+      name: 'N',
+      login: 'n'
+    })
     expect(mapRedmineUser(undefined)).toBeNull()
   })
 })

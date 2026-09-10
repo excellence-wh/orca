@@ -199,7 +199,11 @@ export function TaskPageRedmineContent({
               <Row label="Updated" value={selected.updatedOn} />
               {selected.customFields?.length ? (
                 selected.customFields.map((field, i) => (
-                  <Row key={i} label={field.name} value={field.value ? String(field.value) : undefined} />
+                  <Row
+                    key={i}
+                    label={field.name}
+                    value={field.value ? String(field.value) : undefined}
+                  />
                 ))
               ) : (
                 <Row label="Custom fields" value="—" />
@@ -236,10 +240,7 @@ export function TaskPageRedmineContent({
             {!loading && issues.length === 0 && !error ? (
               <div className="px-4 py-10 text-center">
                 <p className="text-sm font-medium text-foreground">
-                  {translate(
-                    'auto.components.TaskPage.redmineNoIssues',
-                    'No Redmine issues found'
-                  )}
+                  {translate('auto.components.TaskPage.redmineNoIssues', 'No Redmine issues found')}
                 </p>
               </div>
             ) : null}

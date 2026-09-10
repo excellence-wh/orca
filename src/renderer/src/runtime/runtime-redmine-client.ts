@@ -7,10 +7,7 @@ import type {
   RedmineSite,
   RedmineUser
 } from '../../../shared/redmine-types'
-import {
-  callRuntimeRpc,
-  getActiveRuntimeTarget
-} from './runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 import {
   getTaskSourceRuntimeSettings,
   type TaskSourceContext
@@ -50,9 +47,7 @@ export function getRedmineRuntimeTarget(
   )
 }
 
-function normalizeRedmineIssueCollectionResult(
-  result: unknown
-): RedmineIssueCollectionResult {
+function normalizeRedmineIssueCollectionResult(result: unknown): RedmineIssueCollectionResult {
   if (!result || typeof result !== 'object') {
     return { items: [], totalCount: 0 }
   }
@@ -84,12 +79,9 @@ export async function redmineTestConnection(
 ): Promise<RedmineTestConnectionResult> {
   const target = getRedmineRuntimeTarget(settings)
   return target.kind === 'environment'
-    ? callRuntimeRpc<RedmineTestConnectionResult>(
-        target,
-        'redmine.testConnection',
-        args,
-        { timeoutMs: 30_000 }
-      )
+    ? callRuntimeRpc<RedmineTestConnectionResult>(target, 'redmine.testConnection', args, {
+        timeoutMs: 30_000
+      })
     : window.api.redmine.testConnection(args)
 }
 
@@ -131,9 +123,14 @@ export async function redmineListIssues(
   const target = getRedmineRuntimeTarget(settings)
   const result =
     target.kind === 'environment'
-      ? await callRuntimeRpc<unknown>(target, 'redmine.listIssues', filter ? { filter } : undefined, {
-          timeoutMs: 30_000
-        })
+      ? await callRuntimeRpc<unknown>(
+          target,
+          'redmine.listIssues',
+          filter ? { filter } : undefined,
+          {
+            timeoutMs: 30_000
+          }
+        )
       : await window.api.redmine.listIssues(filter ? { filter } : undefined)
   return normalizeRedmineIssueCollectionResult(result)
 }
@@ -144,6 +141,11 @@ export async function redmineGetIssue(
 ): Promise<RedmineIssue | null> {
   const target = getRedmineRuntimeTarget(settings)
   return target.kind === 'environment'
-    ? callRuntimeRpc<RedmineIssue | null>(target, 'redmine.getIssue', { issueId }, { timeoutMs: 30_000 })
+    ? callRuntimeRpc<RedmineIssue | null>(
+        target,
+        'redmine.getIssue',
+        { issueId },
+        { timeoutMs: 30_000 }
+      )
     : window.api.redmine.getIssue({ issueId })
 }

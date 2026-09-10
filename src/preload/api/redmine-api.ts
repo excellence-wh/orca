@@ -21,9 +21,7 @@ export type RedmineApi = {
   testConnection: (args: {
     siteUrl: string
     apiKey: string
-  }) => Promise<
-    { ok: true; user: RedmineUser } | { ok: false; error: RedmineConnectionError }
-  >
+  }) => Promise<{ ok: true; user: RedmineUser } | { ok: false; error: RedmineConnectionError }>
   listIssues: (args?: { filter?: RedmineListFilter }) => Promise<RedmineIssueCollectionResult>
   getIssue: (args: { issueId: number }) => Promise<RedmineIssue | null>
 }

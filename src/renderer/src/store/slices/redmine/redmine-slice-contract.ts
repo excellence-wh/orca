@@ -29,7 +29,9 @@ export type RedmineSlice = {
   testRedmineConnection: (args: {
     siteUrl: string
     apiKey: string
-  }) => Promise<{ ok: true; user: RedmineUser } | { ok: false; error: { type: string; message: string } }>
+  }) => Promise<
+    { ok: true; user: RedmineUser } | { ok: false; error: { type: string; message: string } }
+  >
   disconnectRedmine: () => Promise<void>
   listRedmineIssues: (
     filter?: RedmineListFilter,

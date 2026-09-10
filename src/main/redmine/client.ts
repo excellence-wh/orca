@@ -1,13 +1,5 @@
-import type {
-  RedmineConnectionStatus,
-  RedmineSite,
-  RedmineUser
-} from '../../shared/redmine-types'
-import {
-  classifyRedmineError,
-  normalizeRedmineUrl,
-  redmineRequest
-} from './redmine-request'
+import type { RedmineConnectionStatus, RedmineSite, RedmineUser } from '../../shared/redmine-types'
+import { classifyRedmineError, normalizeRedmineUrl, redmineRequest } from './redmine-request'
 import {
   credentialErrors,
   deleteToken,
@@ -47,18 +39,20 @@ export async function testRedmineConnection(
   apiKey: string
 ): Promise<{ user: RedmineUser | null; error?: RedmineConnectionStatus['error'] }> {
   try {
-    const data = await redmineRequest<{ user?: { id?: number; firstname?: string; lastname?: string; login?: string } }>(
-      siteUrl,
-      apiKey,
-      '/users/current.json',
-      { signal: AbortSignal.timeout(TEST_REQUEST_TIMEOUT_MS) }
-    )
+    const data = await redmineRequest<{
+      user?: { id?: number; firstname?: string; lastname?: string; login?: string }
+    }>(siteUrl, apiKey, '/users/current.json', {
+      signal: AbortSignal.timeout(TEST_REQUEST_TIMEOUT_MS)
+    })
     const user = data?.user
     if (user && typeof user.id === 'number') {
       const name = [user.firstname, user.lastname].filter(Boolean).join(' ') || `User ${user.id}`
       return { user: { id: user.id, name, login: user.login ?? null } }
     }
-    return { user: null, error: { type: 'unknown', message: 'Redmine returned an unexpected user payload.' } }
+    return {
+      user: null,
+      error: { type: 'unknown', message: 'Redmine returned an unexpected user payload.' }
+    }
   } catch (error) {
     return { user: null, error: toConnectionError(error) }
   }
@@ -67,10 +61,18 @@ export async function testRedmineConnection(
 export async function connectRedmineSite(
   siteUrl: string,
   apiKey: string
-): Promise<{ ok: boolean; site?: RedmineSite; viewer?: RedmineUser; error?: RedmineConnectionStatus['error'] }> {
+): Promise<{
+  ok: boolean
+  site?: RedmineSite
+  viewer?: RedmineUser
+  error?: RedmineConnectionStatus['error']
+}> {
   const connection = await testRedmineConnection(siteUrl, apiKey)
   if (connection.error || !connection.user) {
-    return { ok: false, error: connection.error ?? { type: 'unknown', message: 'Unable to connect.' } }
+    return {
+      ok: false,
+      error: connection.error ?? { type: 'unknown', message: 'Unable to connect.' }
+    }
   }
 
   const id = redmineSiteIdForUrl(siteUrl)

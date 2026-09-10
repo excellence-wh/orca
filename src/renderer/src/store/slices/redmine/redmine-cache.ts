@@ -1,9 +1,15 @@
-import type { RedmineConnectionStatus, RedmineListFilter } from '../../../../../shared/redmine-types'
+import type {
+  RedmineConnectionStatus,
+  RedmineListFilter
+} from '../../../../../shared/redmine-types'
 
 export const REDMINE_CACHE_TTL = 60_000 // 60s — same as Linear/GitHub revalidation TTL
 export const MAX_CACHE_ENTRIES = 500
 
-export function isFresh(entry: { fetchedAt: number } | undefined, ttl = REDMINE_CACHE_TTL): boolean {
+export function isFresh(
+  entry: { fetchedAt: number } | undefined,
+  ttl = REDMINE_CACHE_TTL
+): boolean {
   return entry !== undefined && Date.now() - entry.fetchedAt < ttl
 }
 

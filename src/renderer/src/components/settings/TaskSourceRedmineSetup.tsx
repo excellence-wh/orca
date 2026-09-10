@@ -57,9 +57,16 @@ export function TaskSourceRedmineSetup({
       {connected ? (
         <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2.5 text-sm">
           <span className="truncate text-muted-foreground">
-            {status.activeSite?.siteUrl ?? translate('auto.components.settings.TasksPane.redmineConnected', 'Redmine connected')}
+            {status.activeSite?.siteUrl ??
+              translate('auto.components.settings.TasksPane.redmineConnected', 'Redmine connected')}
           </span>
-          <Button type="button" variant="outline" size="sm" disabled={!canHide} onClick={onToggleVisible}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!canHide}
+            onClick={onToggleVisible}
+          >
             {visible
               ? translate('auto.components.settings.TasksPane.hideFromTasks', 'Hide from Tasks')
               : translate('auto.components.settings.TasksPane.showInTasks', 'Show in Tasks')}
