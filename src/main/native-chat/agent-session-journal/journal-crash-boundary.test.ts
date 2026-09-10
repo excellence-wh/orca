@@ -15,6 +15,7 @@ import type {
   AgentJournalMessageItem,
   AgentSessionJournalIdentity
 } from '../../../shared/agent-session-journal-types'
+import { hasUnansweredStructuredAgentSessionDispatch } from '../../../shared/structured-agent-session-projection'
 import { digestPayload } from './journal-payload-bounds'
 import {
   reconcileSubmissions,
@@ -139,6 +140,30 @@ describe('crash between provider accept and journal commit', () => {
     expect(items).toHaveLength(1)
     expect(items[0]?.itemId).toBe(agentJournalSubmissionKey('cm_1'))
     expect(restarted.receiptFor('cm_1')?.providerItemId).toBe(agentJournalItemKey(outcome.identity))
+  })
+
+  it('retires an ack timeout on restart without changing its delivery verdict', async () => {
+    const journal = await open()
+    await journal.appendSubmission({
+      clientMessageId: 'cm_timeout',
+      payloadFingerprint: digestPayload('slow'),
+      body: userMessage('slow'),
+      fence: 1
+    })
+    await journal.resolveDispatch({
+      clientMessageId: 'cm_timeout',
+      state: 'unknown',
+      reason: 'ack timeout',
+      fence: 1
+    })
+    expect(hasUnansweredStructuredAgentSessionDispatch(journal.submissions())).toBe(true)
+    const restarted = await open()
+    await restarted.markPendingSubmissionsUnknown(2)
+    expect(restarted.submissions()[0]?.dispatchState).toBe('unknown')
+    expect(hasUnansweredStructuredAgentSessionDispatch(restarted.submissions())).toBe(false)
+    const cursor = restarted.cursor()
+    await restarted.markPendingSubmissionsUnknown(2)
+    expect(restarted.cursor()).toEqual(cursor)
   })
 
   it('reports a rejected submission as never delivered, and never re-sends it', async () => {

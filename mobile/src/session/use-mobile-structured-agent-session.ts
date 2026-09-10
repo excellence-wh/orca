@@ -297,7 +297,7 @@ export function useMobileStructuredAgentSession(args: {
     // A dispatch the provider has not answered yet is already work — see the desktop hook.
     isWorking:
       activeStructuredAgentSessionTurnId(state.items) !== null ||
-      hasUnansweredStructuredAgentSessionDispatch(state.submissions),
+      hasUnansweredStructuredAgentSessionDispatch(state.submissions, state.fence),
     turnId: activeStructuredAgentSessionTurnId(state.items),
     sendWithOutcome,
     cancel,

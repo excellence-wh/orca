@@ -193,6 +193,7 @@ export type AgentJournalDispatchState = (typeof AGENT_JOURNAL_DISPATCH_STATES)[n
  *  the turn reads as delivery unconfirmed, never as sent and never as failed. */
 export type AgentJournalSubmission = {
   clientMessageId: string
+  /** Execution fence of the latest dispatch attempt or recovery. */
   fence: number
   payloadFingerprint: string
   dispatchState: AgentJournalDispatchState

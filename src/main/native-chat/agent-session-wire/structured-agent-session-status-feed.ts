@@ -31,6 +31,7 @@ type StatusFeedSession = {
   journal: AgentSessionJournal
   params: { location: { workspaceId: string }; provider: AgentSessionRecord['provider'] }
   hasProviderChild?: boolean
+  fence?: number
 }
 
 export type StructuredAgentSessionStatusFeedDeps = {
@@ -166,7 +167,7 @@ export class StructuredAgentSessionStatusFeed {
       workspaceId: session.params.location.workspaceId,
       agent: session.params.provider,
       ...(session.hasProviderChild ? { hostExecutionOwned: true as const } : {}),
-      ...projectStructuredAgentSessionStatusSummary(items, submissions),
+      ...projectStructuredAgentSessionStatusSummary(items, submissions, session.fence),
       ...(record?.rewind?.phase === 'prepared' || record?.rewind?.phase === 'provider-succeeded'
         ? { rewindBlockedReason: 'outcome-unknown' as const }
         : {}),

@@ -190,12 +190,17 @@ export function hasPersistedStructuredAgentSessionTurn(
  * that sent it, so there is nothing still running to report.
  */
 export function hasUnansweredStructuredAgentSessionDispatch(
-  submissions: readonly AgentJournalSubmission[]
+  submissions: readonly AgentJournalSubmission[],
+  currentFence?: number | null
 ): boolean {
   return submissions.some(
     (submission) =>
-      submission.dispatchState === 'pending' ||
-      (submission.dispatchState === 'unknown' && submission.recovered !== true)
+      (currentFence == null || submission.fence >= currentFence) &&
+      (submission.dispatchState === 'pending' ||
+        (submission.dispatchState === 'unknown' &&
+          submission.recovered !== true &&
+          // Older hosts publish the recovery reason but omit the optional marker.
+          submission.reason !== 'host_restarted_before_acknowledgement'))
   )
 }
 
@@ -207,7 +212,8 @@ export function structuredAgentSessionTabId(sessionId: string): string {
 
 export function projectStructuredAgentSessionStatus(
   items: readonly AgentJournalRenderItem[],
-  submissions: readonly AgentJournalSubmission[] = []
+  submissions: readonly AgentJournalSubmission[] = [],
+  currentFence?: number | null
 ): StructuredAgentSessionProjectedStatus {
   if (
     items.some(
@@ -219,7 +225,7 @@ export function projectStructuredAgentSessionStatus(
     return 'attention'
   }
   return activeStructuredAgentSessionTurnId(items) ||
-    hasUnansweredStructuredAgentSessionDispatch(submissions)
+    hasUnansweredStructuredAgentSessionDispatch(submissions, currentFence)
     ? 'working'
     : 'idle'
 }
@@ -299,17 +305,18 @@ export type StructuredAgentSessionStatusProjection = {
  *  has to stay small even though the row only ever renders one line of it. */
 export function projectStructuredAgentSessionStatusSummary(
   items: readonly AgentJournalRenderItem[],
-  submissions: readonly AgentJournalSubmission[] = []
+  submissions: readonly AgentJournalSubmission[] = [],
+  currentFence?: number | null
 ): StructuredAgentSessionStatusProjection {
   // A first send has no journalled message until the provider replays it, so the pending
   // dispatch is also what makes a brand-new session listable at all.
   if (
     !hasPersistedStructuredAgentSessionTurn(items) &&
-    !hasUnansweredStructuredAgentSessionDispatch(submissions)
+    !hasUnansweredStructuredAgentSessionDispatch(submissions, currentFence)
   ) {
     return { status: null, latestPrompt: '' }
   }
-  const status = projectStructuredAgentSessionStatus(items, submissions)
+  const status = projectStructuredAgentSessionStatus(items, submissions, currentFence)
   const activeToolCall = status === 'working' ? activeStructuredAgentSessionToolCall(items) : null
   const toolName = activeToolCall
     ? normalizeOptionalField(activeToolCall.name, AGENT_STATUS_TOOL_NAME_MAX_LENGTH)

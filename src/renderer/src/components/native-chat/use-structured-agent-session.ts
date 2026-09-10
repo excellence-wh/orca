@@ -86,8 +86,7 @@ export function useStructuredAgentSession(args: {
   // A dispatch the provider has not answered is already work; Claude's running row trails the
   // send by seconds, and only a provider-minted turn is cancellable, so the two stay separate.
   const isWorking =
-    turnId !== null ||
-    hasUnansweredStructuredAgentSessionDispatch(state.submissions)
+    turnId !== null || hasUnansweredStructuredAgentSessionDispatch(state.submissions, state.fence)
   const turnActivity = useMemo(
     () => selectStructuredAgentTurnActivity(state.items, turnId, state.activity),
     [state.activity, state.items, turnId]

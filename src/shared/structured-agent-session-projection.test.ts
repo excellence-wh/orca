@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AGENT_STATUS_MAX_FIELD_LENGTH } from './agent-status-field-normalization'
-import type {
-  AgentJournalRenderItem,
-  AgentJournalSubmission
-} from './agent-session-journal-types'
+import type { AgentJournalRenderItem, AgentJournalSubmission } from './agent-session-journal-types'
 import { parsePaneKey } from './stable-pane-id'
 import {
   activeStructuredAgentSessionTurnId,
@@ -180,6 +177,20 @@ describe('structured agent session status projection', () => {
     })
   })
 
+  it('does not resurrect old-host unknown work after its execution fence advances', () => {
+    const oldHostSubmission = { ...submission('m1', 'unknown'), fence: 2 }
+    expect(hasUnansweredStructuredAgentSessionDispatch([oldHostSubmission], 2)).toBe(true)
+    expect(hasUnansweredStructuredAgentSessionDispatch([oldHostSubmission], 3)).toBe(false)
+  })
+
+  it('recognizes recovery from an older host without the optional marker', () => {
+    expect(
+      hasUnansweredStructuredAgentSessionDispatch([
+        { ...submission('m1', 'unknown'), reason: 'host_restarted_before_acknowledgement' }
+      ])
+    ).toBe(false)
+  })
+
   it('stops reading a resolved dispatch as work, and lets a pending prompt outrank it', () => {
     const asked = item('asked', 1, {
       kind: 'message',
@@ -205,9 +216,9 @@ describe('structured agent session status projection', () => {
         { ...submission('m1', 'unknown'), recovered: true }
       ])
     ).toBe(false)
-    expect(projectStructuredAgentSessionStatus([asked, prompt], [submission('m1', 'pending')])).toBe(
-      'attention'
-    )
+    expect(
+      projectStructuredAgentSessionStatus([asked, prompt], [submission('m1', 'pending')])
+    ).toBe('attention')
     expect(projectStructuredAgentSessionStatusSummary([], [])).toEqual({
       status: null,
       latestPrompt: ''
