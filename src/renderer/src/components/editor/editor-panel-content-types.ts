@@ -22,6 +22,8 @@ export type FileContent = {
   content: string
   isBinary: boolean
   isImage?: boolean
+  /** Previewable spreadsheet blob (binary XLSX) delivered as base64 `content`. */
+  isSpreadsheet?: boolean
   mimeType?: string
   fileIdentity?: string
   loadError?: string

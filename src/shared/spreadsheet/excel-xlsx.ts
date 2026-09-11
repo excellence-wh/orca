@@ -50,7 +50,9 @@ export async function parseXlsxWorkbook(data: SpreadsheetDataOrSource): Promise<
   const bytes = toBytes(data)
   const workbook = new ExcelJS.Workbook()
   try {
-    await workbook.xlsx.load(bytes)
+    // Why: exceljs types the load input as a resizable Buffer; cast the
+    // decoded blob (a plain Buffer/Uint8Array) so the generic aligns.
+    await workbook.xlsx.load(bytes as never)
   } catch (error) {
     throw new SpreadsheetParseError('Not a readable .xlsx file.', error)
   }
