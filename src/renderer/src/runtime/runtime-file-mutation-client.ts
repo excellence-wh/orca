@@ -48,10 +48,20 @@ export async function writeRuntimeFile(
     )
     return
   }
-  // Why: the remote runtime files.write path is text-only today; a binary
-  // workbook write is unsupported there until the runtime gains base64 support.
+  // Why: the runtime's text write path cannot carry a binary workbook, so route
+  // base64 payloads through the dedicated files.writeBase64 mutation.
   if (encoding === 'base64') {
-    throw new Error('Saving spreadsheets on remote runtime hosts is not supported yet.')
+    await callRuntimeFileMutation(
+      remoteArgs.target,
+      'files.writeBase64',
+      withSshMutationExpectation(context, {
+        worktree: remoteArgs.worktreeSelector,
+        relativePath: remoteArgs.relativePath,
+        contentBase64: content
+      }),
+      30_000
+    )
+    return
   }
   await callRuntimeFileMutation(
     remoteArgs.target,
