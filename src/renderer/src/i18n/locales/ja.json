@@ -12830,6 +12830,10 @@
           "saveFailed": "スプレッドシートの保存に失敗しました。もう一度お試しください。",
           "saving": "保存中…"
         },
+        "OfficeDocumentViewer": {
+          "loading": "ドキュメントを読み込んでいます…",
+          "readFailed": "ドキュメントを表示できませんでした。"
+        },
 
         "DiffNotesSendMenu": {
           "f1aa04b5cf": "このファイル",

@@ -4,6 +4,7 @@ import { extname } from 'node:path'
 import type { DirEntry, MarkdownDocument } from '../../../shared/filesystem-entry-types'
 import { sortDirEntries } from '../../../shared/file-name-sort'
 import { SPREADSHEET_FILE_MIME_TYPES } from '../../../shared/spreadsheet-file-extensions'
+import { OFFICE_DOCUMENT_FILE_MIME_TYPES } from '../../../shared/office-file-extensions'
 import { requireSshFilesystemProvider } from '../../providers/ssh-filesystem-dispatch'
 import { resolveRegisteredWorktreePath } from '../registered-worktree-roots-cache'
 import { resolveAuthorizedPath } from '../filesystem-auth'
@@ -72,6 +73,7 @@ export function registerFilesystemReadHandlers(context: FilesystemHandlerContext
       isBinary: boolean
       isImage?: boolean
       isSpreadsheet?: boolean
+      isOfficeDocument?: boolean
       mimeType?: string
       fileIdentity?: string
     }> => {
@@ -87,7 +89,8 @@ export function registerFilesystemReadHandlers(context: FilesystemHandlerContext
       const extension = extname(filePath).toLowerCase()
       const mimeType = PREVIEWABLE_BINARY_MIME_TYPES[extension]
       const spreadsheetMimeType = SPREADSHEET_FILE_MIME_TYPES[extension]
-      const binaryMimeType = mimeType ?? spreadsheetMimeType
+      const officeDocumentMimeType = OFFICE_DOCUMENT_FILE_MIME_TYPES[extension]
+      const binaryMimeType = mimeType ?? spreadsheetMimeType ?? officeDocumentMimeType
       const sizeLimit = binaryMimeType ? MAX_PREVIEWABLE_BINARY_SIZE : MAX_TEXT_FILE_SIZE
       if (stats.size > sizeLimit) {
         throw new Error(
@@ -100,10 +103,12 @@ export function registerFilesystemReadHandlers(context: FilesystemHandlerContext
         return {
           content: buffer.toString('base64'),
           isBinary: true,
-          // Why: the renderer keys image preview off `isImage` and the
-          // spreadsheet grid off `isSpreadsheet`; only one is set per blob.
-          isImage: spreadsheetMimeType ? undefined : true,
+          // Why: the renderer keys image preview off `isImage`, the spreadsheet
+          // grid off `isSpreadsheet`, and the docx preview off `isOfficeDocument`;
+          // only one is set per blob.
+          isImage: spreadsheetMimeType || officeDocumentMimeType ? undefined : true,
           isSpreadsheet: spreadsheetMimeType ? true : undefined,
+          isOfficeDocument: officeDocumentMimeType ? true : undefined,
           mimeType: binaryMimeType
         }
       }

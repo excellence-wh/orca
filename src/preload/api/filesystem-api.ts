@@ -33,6 +33,7 @@ export type FilesystemApi = {
       isBinary: boolean
       isImage?: boolean
       isSpreadsheet?: boolean
+      isOfficeDocument?: boolean
       mimeType?: string
       fileIdentity?: string
     }>

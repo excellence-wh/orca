@@ -24,6 +24,8 @@ export type FileContent = {
   isImage?: boolean
   /** Previewable spreadsheet blob (binary XLSX) delivered as base64 `content`. */
   isSpreadsheet?: boolean
+  /** Previewable office-document blob (binary DOCX) delivered as base64 `content`. */
+  isOfficeDocument?: boolean
   mimeType?: string
   fileIdentity?: string
   loadError?: string

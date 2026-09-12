@@ -14076,6 +14076,10 @@
           "saveFailed": "Échec de l'enregistrement de la feuille de calcul. Veuillez réessayer.",
           "saving": "Enregistrement…"
         },
+        "OfficeDocumentViewer": {
+          "loading": "Chargement du document…",
+          "readFailed": "Impossible d'afficher le document."
+        },
 
         "DiffNotesSendMenu": {
           "f1aa04b5cf": "Ce fichier",

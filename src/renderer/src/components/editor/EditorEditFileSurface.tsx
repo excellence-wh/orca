@@ -9,6 +9,7 @@ import {
   IpynbViewer,
   MermaidViewer,
   MonacoEditor,
+  OfficeDocumentViewer,
   SpreadsheetFileSurface
 } from './editor-lazy-views'
 import type { EditorConflictNavigation } from './useEditorConflictNavigation'
@@ -117,6 +118,9 @@ export function EditorEditFileSurface({
         onDirty={handleDirtyStateHint}
       />
     )
+  }
+  if (fileContent.isOfficeDocument === true) {
+    return <OfficeDocumentViewer content={fileContent.content} filePath={activeFile.filePath} />
   }
   if (fileContent.isBinary) {
     if (fileContent.isImage) {

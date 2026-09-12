@@ -16,9 +16,8 @@ import { readFullStreamChunk } from './fs-handler-stream-chunk'
 
 export async function readRelayFileContent(filePath: string) {
   const stats = await stat(filePath)
-  const { spreadsheetMimeType, binaryMimeType } = resolvePreviewableBinaryMime(
-    extname(filePath).toLowerCase()
-  )
+  const { spreadsheetMimeType, officeDocumentMimeType, binaryMimeType } =
+    resolvePreviewableBinaryMime(extname(filePath).toLowerCase())
   const sizeLimit = binaryMimeType ? MAX_PREVIEWABLE_BINARY_SIZE : MAX_TEXT_FILE_SIZE
   if (stats.size > sizeLimit) {
     throw new Error(
@@ -30,8 +29,9 @@ export async function readRelayFileContent(filePath: string) {
     return {
       content: buffer.toString('base64'),
       isBinary: true,
-      isImage: spreadsheetMimeType ? undefined : true,
+      isImage: spreadsheetMimeType || officeDocumentMimeType ? undefined : true,
       isSpreadsheet: spreadsheetMimeType ? true : undefined,
+      isOfficeDocument: officeDocumentMimeType ? true : undefined,
       mimeType: binaryMimeType
     }
   }
@@ -53,6 +53,7 @@ export type StreamMetadata = {
   isBinary: boolean
   isImage?: boolean
   isSpreadsheet?: boolean
+  isOfficeDocument?: boolean
   mimeType?: string
   /** On-the-wire encoding of each chunk's `data` field. Always 'base64'. */
   chunkEncoding?: 'base64'
@@ -79,9 +80,12 @@ export async function readRelayFileStreamMetadata(
   pumpOptions?: StreamPumpOptions
 ): Promise<StreamMetadata> {
   const stats = await stat(filePath)
-  const { imageMimeType: mimeType, spreadsheetMimeType, binaryMimeType } = resolvePreviewableBinaryMime(
-    extname(filePath).toLowerCase()
-  )
+  const {
+    imageMimeType: mimeType,
+    spreadsheetMimeType,
+    officeDocumentMimeType,
+    binaryMimeType
+  } = resolvePreviewableBinaryMime(extname(filePath).toLowerCase())
   const sizeLimit = binaryMimeType ? MAX_PREVIEWABLE_BINARY_SIZE : MAX_TEXT_FILE_SIZE
   if (stats.size > sizeLimit) {
     throw new Error(
@@ -96,6 +100,7 @@ export async function readRelayFileStreamMetadata(
       mimeType: binaryMimeType,
       isImage: mimeType ? true : undefined,
       isSpreadsheet: spreadsheetMimeType ? true : undefined,
+      isOfficeDocument: officeDocumentMimeType ? true : undefined,
       empty: true
     }
   }
@@ -142,6 +147,7 @@ export async function readRelayFileStreamMetadata(
     isBinary: !!binaryMimeType,
     isImage: mimeType ? true : undefined,
     isSpreadsheet: spreadsheetMimeType ? true : undefined,
+    isOfficeDocument: officeDocumentMimeType ? true : undefined,
     mimeType: binaryMimeType,
     chunkEncoding: 'base64',
     resultEncoding: binaryMimeType ? 'base64' : 'utf-8'

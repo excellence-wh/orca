@@ -12908,6 +12908,7 @@
           "saveFailed": "保存电子表格失败，请重试。",
           "saving": "保存中…"
         },
+        "OfficeDocumentViewer": { "loading": "正在加载文档…", "readFailed": "无法显示该文档。" },
 
         "DiffNotesSendMenu": {
           "f1aa04b5cf": "这个文件",

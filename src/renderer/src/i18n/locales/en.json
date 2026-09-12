@@ -14630,6 +14630,10 @@
           "saveFailed": "Failed to save the spreadsheet. Please try again.",
           "saving": "Saving…"
         },
+        "OfficeDocumentViewer": {
+          "loading": "Loading document…",
+          "readFailed": "The document could not be displayed."
+        },
 
         "DiffNotesSendMenu": {
           "f1aa04b5cf": "This file",

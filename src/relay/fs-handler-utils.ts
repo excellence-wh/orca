@@ -17,6 +17,7 @@ import {
 } from '../shared/text-search'
 import { IMAGE_FILE_MIME_TYPES } from '../shared/image-file-extensions'
 import { SPREADSHEET_FILE_MIME_TYPES } from '../shared/spreadsheet-file-extensions'
+import { OFFICE_DOCUMENT_FILE_MIME_TYPES } from '../shared/office-file-extensions'
 import type { SearchResult as SharedSearchResult } from '../shared/code-search-types'
 import {
   absorbPendingRipgrepSpawnError,
@@ -46,18 +47,21 @@ export const IMAGE_MIME_TYPES: Record<string, string> = {
 }
 
 // Why: classify a previewable binary by extension once so the single-shot and
-// streamed read paths agree on image vs spreadsheet vs generic binary.
+// streamed read paths agree on image vs spreadsheet vs office vs generic binary.
 export function resolvePreviewableBinaryMime(extension: string): {
   imageMimeType?: string
   spreadsheetMimeType?: string
+  officeDocumentMimeType?: string
   binaryMimeType?: string
 } {
   const imageMimeType = IMAGE_MIME_TYPES[extension]
   const spreadsheetMimeType = SPREADSHEET_FILE_MIME_TYPES[extension]
+  const officeDocumentMimeType = OFFICE_DOCUMENT_FILE_MIME_TYPES[extension]
   return {
     imageMimeType,
     spreadsheetMimeType,
-    binaryMimeType: imageMimeType ?? spreadsheetMimeType
+    officeDocumentMimeType,
+    binaryMimeType: imageMimeType ?? spreadsheetMimeType ?? officeDocumentMimeType
   }
 }
 
