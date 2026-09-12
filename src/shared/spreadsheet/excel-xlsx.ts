@@ -84,17 +84,38 @@ export async function serializeXlsxWorkbook(data: SpreadsheetData): Promise<stri
   }
   const buffer = await workbook.xlsx.writeBuffer()
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
-  return Buffer.from(bytes).toString('base64')
+  return bytesToBase64(bytes)
 }
 
-type SpreadsheetDataOrSource = ArrayBuffer | Uint8Array | Buffer | string
+type SpreadsheetDataOrSource = ArrayBuffer | Uint8Array | string
 
-function toBytes(source: SpreadsheetDataOrSource): Buffer {
+// Why: this shared module also runs in the renderer (browser), where the
+// global `Buffer` is undefined. `atob`/`btoa` exist in both Node >= 16 and
+// browsers, so base64 round-trips without importing a polyfill.
+function toBytes(source: SpreadsheetDataOrSource): Uint8Array {
   if (typeof source === 'string') {
-    return Buffer.from(source, 'base64')
+    return base64ToBytes(source)
   }
   if (source instanceof Uint8Array) {
-    return Buffer.from(source)
+    return source
   }
-  return Buffer.from(new Uint8Array(source))
+  return new Uint8Array(source)
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk))
+  }
+  return btoa(binary)
 }

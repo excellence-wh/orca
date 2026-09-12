@@ -77,7 +77,10 @@ export default function SpreadsheetFileSurface({
           setLoad({ status: 'ready', data })
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        // Why: surface the real exc.message + exceljs cause in devtools — the
+        // user-facing copy intentionally hides the raw parser detail.
+        console.error('[spreadsheet] failed to parse', error)
         if (!cancelled) {
           setLoad({
             status: 'error',
