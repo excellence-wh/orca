@@ -28,25 +28,31 @@ type SpreadsheetFileSurfaceProps = {
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; data: SpreadsheetData }
+  /** `delimiter` is the CSV field separator detected from the file content. */
+  | { status: 'ready'; data: SpreadsheetData; delimiter: string }
   | { status: 'error'; message: string }
 
 async function loadSpreadsheet(
   kind: 'csv' | 'xlsx',
   content: string,
   filePath: string
-): Promise<SpreadsheetData> {
+): Promise<{ data: SpreadsheetData; delimiter: string }> {
   if (kind === 'xlsx') {
-    return parseXlsxWorkbook(content)
+    return { data: await parseXlsxWorkbook(content), delimiter: '' }
   }
+  // Why: detect the separator from the real content so edits re-serialize with
+  // the same character (a tab-delimited .csv must not be rewritten with commas).
   const delimiter = detectCsvDelimiter(filePath, content)
   const { rows } = parseCsv(content, delimiter)
   if (rows.length === 0) {
-    return emptySpreadsheetData()
+    return { data: emptySpreadsheetData(), delimiter }
   }
   return {
-    worksheets: [{ name: 'Sheet1', rows: rows.map((row) => [...row]) }],
-    activeSheetIndex: 0
+    data: {
+      worksheets: [{ name: 'Sheet1', rows: rows.map((row) => [...row]) }],
+      activeSheetIndex: 0
+    },
+    delimiter
   }
 }
 
@@ -64,6 +70,9 @@ export default function SpreadsheetFileSurface({
   const [saving, setSaving] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
+  // Why: an edit during an in-flight XLSX write is not in the saved snapshot, so
+  // track a revision and only clear dirty when no edit landed since the save.
+  const revisionRef = useRef(0)
   const onDirtyRef = useRef(onDirty)
   onDirtyRef.current = onDirty
 
@@ -72,9 +81,9 @@ export default function SpreadsheetFileSurface({
     setLoad({ status: 'loading' })
     setActiveSheetIndex(0)
     loadSpreadsheet(kind, content, filePath)
-      .then((data) => {
+      .then((result) => {
         if (!cancelled) {
-          setLoad({ status: 'ready', data })
+          setLoad({ status: 'ready', data: result.data, delimiter: result.delimiter })
         }
       })
       .catch((error) => {
@@ -97,6 +106,8 @@ export default function SpreadsheetFileSurface({
   }, [kind, content, filePath])
 
   const data = load.status === 'ready' ? load.data : emptySpreadsheetData()
+  /** The separator detected at load time; edits re-serialize with it. */
+  const csvDelimiter = load.status === 'ready' ? load.delimiter : ','
   const activeSheet = data.worksheets[
     Math.min(activeSheetIndex, Math.max(data.worksheets.length - 1, 0))
   ] ?? {
@@ -113,11 +124,12 @@ export default function SpreadsheetFileSurface({
   }
 
   const updateCell = (rowIndex: number, colIndex: number, value: string): void => {
+    revisionRef.current += 1
     if (kind === 'csv') {
       // Why: keep the text draft in sync so the normal Cmd+S / autosave path
       // (and dirty indicator) apply to CSV exactly as for other text files.
       const rows = buildPatchRows(load, rowIndex, colIndex, value)
-      onCsvChange(serializeCsvRows(rows, kindDelimiter(filePath)))
+      onCsvChange(serializeCsvRows(rows, csvDelimiter))
       return
     }
     markDirty()
@@ -128,7 +140,7 @@ export default function SpreadsheetFileSurface({
       const next = cloneData(prev.data)
       ensureCell(next, activeSheetIndex, rowIndex, colIndex)
       next.worksheets[activeSheetIndex]!.rows[rowIndex]![colIndex] = parseCellValue(value)
-      return { status: 'ready', data: next }
+      return { status: 'ready', data: next, delimiter: prev.delimiter }
     })
   }
 
@@ -136,21 +148,23 @@ export default function SpreadsheetFileSurface({
     if (load.status !== 'ready') {
       return
     }
+    // Why: snapshot the revision so an edit that lands during the async write
+    // keeps the tab dirty (the saved snapshot does not include it).
+    const revisionAtSave = revisionRef.current
     setSaving(true)
     try {
       if (kind === 'csv') {
-        const csv = serializeCsvRows(
-          data.worksheets[activeSheetIndex]?.rows ?? [],
-          kindDelimiter(filePath)
-        )
+        const csv = serializeCsvRows(data.worksheets[activeSheetIndex]?.rows ?? [], csvDelimiter)
         onCsvChange(csv)
         await requestEditorFileSave({ fileId, fallbackContent: csv })
       } else {
         const base64 = await serializeXlsxWorkbook(data)
         await requestEditorFileSave({ fileId, fallbackContent: base64, encoding: 'base64' })
       }
-      dirtyRef.current = false
-      onDirtyRef.current(false)
+      if (revisionRef.current === revisionAtSave) {
+        dirtyRef.current = false
+        onDirtyRef.current(false)
+      }
     } catch {
       toast.error(
         translate(
@@ -201,10 +215,6 @@ export default function SpreadsheetFileSurface({
   )
 }
 
-function kindDelimiter(filePath: string): string {
-  return detectCsvDelimiter(filePath, '')
-}
-
 function parseCellValue(raw: string): SpreadsheetCell {
   if (raw === '') {
     return null
@@ -250,6 +260,8 @@ function ensureCell(
 }
 
 // Why: CSV serializes on every keystroke, so produce the patched rows directly.
+// CSV fields stay raw text — numeric coercion would rewrite identifiers like
+// `00123` as `123` and drop trailing zeros on save.
 function buildPatchRows(
   load: LoadState,
   rowIndex: number,
@@ -258,7 +270,7 @@ function buildPatchRows(
 ): SpreadsheetRow[] {
   const data = load.status === 'ready' ? cloneData(load.data) : emptySpreadsheetData()
   ensureCell(data, 0, rowIndex, colIndex)
-  data.worksheets[0]!.rows[rowIndex]![colIndex] = parseCellValue(value)
+  data.worksheets[0]!.rows[rowIndex]![colIndex] = value
   return data.worksheets[0]?.rows ?? []
 }
 

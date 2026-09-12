@@ -33,7 +33,20 @@ function normalizeCellValue(value: unknown): SpreadsheetCell {
   }
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>
-    // Rich text, hyperlink cells, and shared strings all expose .text.
+    // Rich text: exceljs exposes the runs, not a flat `.text`.
+    if (Array.isArray(obj.richText)) {
+      return obj.richText
+        .map((run) => {
+          const text = (run as { text?: unknown } | null)?.text
+          return typeof text === 'string' ? text : ''
+        })
+        .join('')
+    }
+    // Error cells (`#DIV/0!`, ...) carry `.error`, not `.text`.
+    if (typeof obj.error === 'string') {
+      return obj.error
+    }
+    // Hyperlink cells and shared strings expose `.text`.
     if (typeof obj.text === 'string') {
       return obj.text
     }
@@ -58,17 +71,18 @@ export async function parseXlsxWorkbook(data: SpreadsheetDataOrSource): Promise<
   }
   const worksheets: SpreadsheetWorksheet[] = workbook.worksheets.map((sheet) => {
     const rows: SpreadsheetRow[] = []
-    sheet.eachRow((row, rowNumber) => {
-      void rowNumber
+    // Why: eachRow() skips blank rows, which would shift every row below a gap;
+    // walk the full row range so empty rows survive the round-trip.
+    for (let rowNumber = 1; rowNumber <= sheet.rowCount; rowNumber++) {
       const cells: SpreadsheetCell[] = []
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      sheet.getRow(rowNumber).eachCell({ includeEmpty: true }, (cell, colNumber) => {
         while (cells.length < colNumber - 1) {
           cells.push(null)
         }
         cells.push(normalizeCellValue(cell.value))
       })
       rows.push(cells)
-    })
+    }
     return { name: sheet.name, rows }
   })
   return { worksheets, activeSheetIndex: 0 }

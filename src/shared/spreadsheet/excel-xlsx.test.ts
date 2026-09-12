@@ -3,6 +3,11 @@ import ExcelJS from 'exceljs'
 import { emptySpreadsheetData, type SpreadsheetData } from './spreadsheet-data'
 import { parseXlsxWorkbook, serializeXlsxWorkbook } from './excel-xlsx'
 
+function toBase64(buffer: ExcelJS.Buffer): string {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+  return Buffer.from(bytes).toString('base64')
+}
+
 async function buildFixtures(): Promise<{ base64: string }> {
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Data')
@@ -14,9 +19,7 @@ async function buildFixtures(): Promise<{ base64: string }> {
   sheet.getCell('C5').value = null
   sheet.addRow(['skipped-mid'])
   sheet.getCell('C6').value = 42
-  const buffer = await workbook.xlsx.writeBuffer()
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
-  return { base64: Buffer.from(bytes).toString('base64') }
+  return { base64: toBase64(await workbook.xlsx.writeBuffer()) }
 }
 
 describe('parseXlsxWorkbook', () => {
@@ -31,7 +34,39 @@ describe('parseXlsxWorkbook', () => {
     expect(data.worksheets[0]!.rows[2]).toEqual(['gadget', 11, false])
     // Sparse cells normalize to null with explicit gap fill.
     expect(data.worksheets[0]!.rows[3]).toEqual([null, 0, 'tail'])
-    expect(data.worksheets[0]!.rows[4]).toEqual(['skipped-mid', null, 42])
+    // The blank row is kept (not skipped), so later rows keep their index.
+    expect(data.worksheets[0]!.rows[4]).toEqual([])
+    expect(data.worksheets[0]!.rows[5]).toEqual(['skipped-mid', null, 42])
+  })
+
+  it('preserves blank rows instead of shifting later rows up', async () => {
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Gaps')
+    sheet.getCell('A1').value = 'first'
+    sheet.getCell('A4').value = 'fourth'
+    const data = await parseXlsxWorkbook(toBase64(await workbook.xlsx.writeBuffer()))
+
+    const rows = data.worksheets[0]!.rows
+    expect(rows).toHaveLength(4)
+    expect(rows[0]).toEqual(['first'])
+    expect(rows[1]).toEqual([])
+    expect(rows[2]).toEqual([])
+    expect(rows[3]).toEqual(['fourth'])
+  })
+
+  it('flattens rich-text runs and keeps error values', async () => {
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Rich')
+    sheet.getCell('A1').value = {
+      richText: [
+        { font: { bold: true }, text: 'Hello ' },
+        { font: { italic: true }, text: 'World' }
+      ]
+    } as never
+    sheet.getCell('B1').value = { error: '#DIV/0!' } as never
+    const data = await parseXlsxWorkbook(toBase64(await workbook.xlsx.writeBuffer()))
+
+    expect(data.worksheets[0]!.rows[0]).toEqual(['Hello World', '#DIV/0!'])
   })
 
   it('rejects a buffer that is not a workbook', async () => {
@@ -42,9 +77,7 @@ describe('parseXlsxWorkbook', () => {
   it('returns empty worksheets when no rows exist', async () => {
     const workbook = new ExcelJS.Workbook()
     workbook.addWorksheet('Blank')
-    const buffer = await workbook.xlsx.writeBuffer()
-    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
-    const data = await parseXlsxWorkbook(Buffer.from(bytes).toString('base64'))
+    const data = await parseXlsxWorkbook(toBase64(await workbook.xlsx.writeBuffer()))
     expect(data.worksheets[0]!.rows).toEqual([])
   })
 })
@@ -65,6 +98,16 @@ describe('serializeXlsxWorkbook', () => {
       [1, 'two'],
       [null, true]
     ])
+  })
+
+  it('keeps blank rows so a save never shifts later rows up', async () => {
+    const data: SpreadsheetData = emptySpreadsheetData('Gaps')
+    data.worksheets[0]!.rows = [['first'], [], [], ['fourth']]
+    const parsed = await parseXlsxWorkbook(await serializeXlsxWorkbook(data))
+    const rows = parsed.worksheets[0]!.rows
+    expect(rows).toHaveLength(4)
+    expect(rows[0]).toEqual(['first'])
+    expect(rows[3]).toEqual(['fourth'])
   })
 
   it('serializes multiple worksheets preserving names', async () => {

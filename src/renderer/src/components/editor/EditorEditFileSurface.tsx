@@ -106,8 +106,18 @@ export function EditorEditFileSurface({
       />
     )
   }
+  const currentContent = editBuffer ?? fileContent.content
+  const externalChangeBanner =
+    activeFile.externalMutation === 'changed' ? (
+      <ExternalFileChangeBanner
+        file={activeFile}
+        currentContent={currentContent}
+        reloadContent={reloadContent}
+      />
+    ) : null
+
   if (fileContent.isSpreadsheet === true) {
-    return (
+    const spreadsheetSurface = (
       <SpreadsheetFileSurface
         fileId={activeFile.id}
         filePath={activeFile.filePath}
@@ -117,6 +127,17 @@ export function EditorEditFileSurface({
         onCsvChange={noopEditorContentChange}
         onDirty={handleDirtyStateHint}
       />
+    )
+    // Why: an editable workbook must still warn (and let the user choose) when
+    // the file changed on disk, like every other editor surface.
+    if (!externalChangeBanner) {
+      return spreadsheetSurface
+    }
+    return (
+      <div className="flex flex-1 min-h-0 flex-col">
+        {externalChangeBanner}
+        <div className="min-h-0 flex-1">{spreadsheetSurface}</div>
+      </div>
     )
   }
   if (fileContent.isOfficeDocument === true) {
@@ -142,16 +163,6 @@ export function EditorEditFileSurface({
       </div>
     )
   }
-
-  const currentContent = editBuffer ?? fileContent.content
-  const externalChangeBanner =
-    activeFile.externalMutation === 'changed' ? (
-      <ExternalFileChangeBanner
-        file={activeFile}
-        currentContent={currentContent}
-        reloadContent={reloadContent}
-      />
-    ) : null
 
   if (isChangesMode) {
     const changesView = (

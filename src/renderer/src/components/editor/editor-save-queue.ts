@@ -96,7 +96,10 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
           return
         }
 
-        const contentToSave = state.editorDrafts[file.id] ?? fallbackContent
+        // Why: a base64 (binary workbook) save must write the payload the caller
+        // handed us — `editorDrafts` holds text and would corrupt the file.
+        const contentToSave =
+          encoding === 'base64' ? fallbackContent : (state.editorDrafts[file.id] ?? fallbackContent)
         const worktree = liveFile.worktreeId
           ? findWorktreeById(state.worktreesByRepo ?? {}, liveFile.worktreeId)
           : null
