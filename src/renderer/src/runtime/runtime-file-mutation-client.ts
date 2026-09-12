@@ -32,15 +32,26 @@ export async function readRuntimeDirectory(
 export async function writeRuntimeFile(
   context: RuntimeFileOperationArgs,
   filePath: string,
-  content: string
+  content: string,
+  encoding?: 'utf-8' | 'base64'
 ): Promise<void> {
   const remoteArgs = getRemoteFileArgs(context, filePath)
   if (!remoteArgs) {
     assertLocalFilesystemFallbackAllowed(context)
     await window.api.fs.writeFile(
-      withSshMutationExpectation(context, { filePath, content, connectionId: context.connectionId })
+      withSshMutationExpectation(context, {
+        filePath,
+        content,
+        connectionId: context.connectionId,
+        encoding
+      })
     )
     return
+  }
+  // Why: the remote runtime files.write path is text-only today; a binary
+  // workbook write is unsupported there until the runtime gains base64 support.
+  if (encoding === 'base64') {
+    throw new Error('Saving spreadsheets on remote runtime hosts is not supported yet.')
   }
   await callRuntimeFileMutation(
     remoteArgs.target,

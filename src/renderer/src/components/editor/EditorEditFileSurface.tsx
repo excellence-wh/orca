@@ -5,11 +5,11 @@ import type { GitStatusEntry } from '../../../../shared/git-status-types'
 import { ChangesModeView } from './ChangesModeView'
 import { ConflictBanner, ConflictPlaceholderView } from './ConflictComponents'
 import {
-  CsvViewer,
   ImageViewer,
   IpynbViewer,
   MermaidViewer,
-  MonacoEditor
+  MonacoEditor,
+  SpreadsheetFileSurface
 } from './editor-lazy-views'
 import type { EditorConflictNavigation } from './useEditorConflictNavigation'
 import { EditorFileLoadErrorView } from './EditorFileLoadErrorView'
@@ -102,6 +102,19 @@ export function EditorEditFileSurface({
       <EditorFileLoadErrorView
         message={fileContent.loadError}
         onRetry={() => reloadContent(activeFile)}
+      />
+    )
+  }
+  if (fileContent.isSpreadsheet === true) {
+    return (
+      <SpreadsheetFileSurface
+        fileId={activeFile.id}
+        filePath={activeFile.filePath}
+        kind="xlsx"
+        content={fileContent.content}
+        readOnly={activeFile.readOnly === true}
+        onCsvChange={noopEditorContentChange}
+        onDirty={handleDirtyStateHint}
       />
     )
   }
@@ -227,7 +240,16 @@ export function EditorEditFileSurface({
   ) : isMermaid && mdViewMode === 'rich' ? (
     <MermaidViewer key={activeFile.id} content={currentContent} filePath={activeFile.filePath} />
   ) : isCsv && mdViewMode === 'rich' ? (
-    <CsvViewer key={activeFile.id} content={currentContent} filePath={activeFile.filePath} />
+    <SpreadsheetFileSurface
+      key={activeFile.id}
+      fileId={activeFile.id}
+      filePath={activeFile.filePath}
+      kind="csv"
+      content={currentContent}
+      readOnly={activeFile.readOnly === true}
+      onCsvChange={handleContentChange}
+      onDirty={handleDirtyStateHint}
+    />
   ) : isNotebook && mdViewMode === 'rich' ? (
     <IpynbViewer
       key={activeFile.id}

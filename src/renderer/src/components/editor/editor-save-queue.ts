@@ -26,7 +26,8 @@ export type EditorSaveQueue = {
   queueSave: (
     file: OpenFile,
     fallbackContent: string,
-    trigger?: 'autosave' | 'user'
+    trigger?: 'autosave' | 'user',
+    encoding?: 'utf-8' | 'base64'
   ) => Promise<void>
   quiesceFileSave: (fileId: string) => Promise<void>
   clearAutoSaveTimer: (fileId: string) => void
@@ -58,7 +59,8 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
   const queueSave = (
     file: OpenFile,
     fallbackContent: string,
-    trigger: 'autosave' | 'user' = 'user'
+    trigger: 'autosave' | 'user' = 'user',
+    encoding?: 'utf-8' | 'base64'
   ): Promise<void> => {
     clearAutoSaveTimer(file.id)
     const queuedGeneration = saveGeneration.get(file.id) ?? 0
@@ -110,7 +112,7 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
             : undefined
         )
         try {
-          await writeRuntimeFile(fileContext, liveFile.filePath, contentToSave)
+          await writeRuntimeFile(fileContext, liveFile.filePath, contentToSave, encoding)
         } catch (error) {
           // Why: the self-write stamp is only valid after a real write; clear on failure so it can't suppress a real update.
           clearSelfWrite(liveFile.filePath, liveFile.runtimeEnvironmentId)
