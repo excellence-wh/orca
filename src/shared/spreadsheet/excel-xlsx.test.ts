@@ -107,6 +107,8 @@ describe('serializeXlsxWorkbook', () => {
     const rows = parsed.worksheets[0]!.rows
     expect(rows).toHaveLength(4)
     expect(rows[0]).toEqual(['first'])
+    expect(rows[1]).toEqual([])
+    expect(rows[2]).toEqual([])
     expect(rows[3]).toEqual(['fourth'])
   })
 
