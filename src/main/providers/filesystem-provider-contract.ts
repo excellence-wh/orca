@@ -28,6 +28,14 @@ export type FileReadLimits = {
   maxTextBytes?: number
 }
 
+/**
+ * Base64 writes are create-only by default (SFTP exclusive / `wx`), which uploads rely on. A save
+ * replaces the file it is editing, so it passes `overwrite: true`.
+ */
+export type FileBase64WriteOptions = {
+  overwrite?: boolean
+}
+
 export type FileRangeReadResult = {
   /** Raw bytes for `[position, position + bytesRead)`. `bytesRead < length`
    *  always means end of file: the host loops until the window is filled, and
@@ -84,8 +92,17 @@ export type IFilesystemProvider = {
     content: string,
     options: TerminalArtifactAccessOptions
   ): Promise<FileStat>
-  writeFileBase64(filePath: string, contentBase64: string): Promise<void>
-  writeFileBase64Chunk(filePath: string, contentBase64: string, append: boolean): Promise<void>
+  writeFileBase64(
+    filePath: string,
+    contentBase64: string,
+    options?: FileBase64WriteOptions
+  ): Promise<void>
+  writeFileBase64Chunk(
+    filePath: string,
+    contentBase64: string,
+    append: boolean,
+    options?: FileBase64WriteOptions
+  ): Promise<void>
   stat(filePath: string): Promise<FileStat>
   lstat?(filePath: string): Promise<FileStat>
   deletePath(targetPath: string, recursive?: boolean): Promise<void>

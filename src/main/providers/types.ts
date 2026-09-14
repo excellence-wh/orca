@@ -18,6 +18,7 @@ export type {
 // ─── Filesystem Provider ────────────────────────────────────────────
 
 export type {
+  FileBase64WriteOptions,
   FileRangeReadResult,
   FileReadLimits,
   FileReadResult,

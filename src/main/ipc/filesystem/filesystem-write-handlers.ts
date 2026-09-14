@@ -32,9 +32,11 @@ export function registerFilesystemWriteHandlers(context: FilesystemHandlerContex
       if (args.connectionId) {
         const provider = requireSshFilesystemProvider(args.connectionId)
         // Why: the relay fs.writeFile channel is text-only, so binary content
-        // (xlsx write-back) goes through the dedicated SFTP base64 path.
+        // (xlsx write-back) goes through the dedicated SFTP base64 path. This
+        // channel is a write (it replaces), so the binary branch overwrites like
+        // the text branch below instead of failing on an existing workbook.
         if (args.encoding === 'base64') {
-          return provider.writeFileBase64(args.filePath, args.content)
+          return provider.writeFileBase64(args.filePath, args.content, { overwrite: true })
         }
         return provider.writeFile(args.filePath, args.content)
       }

@@ -84,6 +84,7 @@ export const fsApi = {
       filePath: string
       content: string
       connectionId?: string
+      encoding?: 'utf-8' | 'base64'
     } & SshMutationExpectation
   ): Promise<void> => ipcRenderer.invoke('fs:writeFile', args),
   createFile: (

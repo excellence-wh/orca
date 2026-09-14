@@ -17,6 +17,7 @@ import {
 } from './ssh-filesystem-provider-watch'
 import type {
   IFilesystemProvider,
+  FileBase64WriteOptions,
   FileRangeReadResult,
   FileReadLimits,
   FileStat,
@@ -187,18 +188,26 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     await this.mux.request('fs.writeFile', { filePath, content })
   }
 
-  async writeFileBase64(filePath: string, contentBase64: string): Promise<void> {
-    await this.writeFileBase64Chunk(filePath, contentBase64, false)
+  async writeFileBase64(
+    filePath: string,
+    contentBase64: string,
+    options?: FileBase64WriteOptions
+  ): Promise<void> {
+    await this.writeFileBase64Chunk(filePath, contentBase64, false, options)
   }
 
   async writeFileBase64Chunk(
     filePath: string,
     contentBase64: string,
-    append: boolean
+    append: boolean,
+    options?: FileBase64WriteOptions
   ): Promise<void> {
     const contents = Buffer.from(contentBase64, 'base64')
+    // Why: create-only unless asked to replace (SFTP exclusive), so uploads cannot clobber while a
+    // save of an existing file still lands.
+    const exclusive = !append && options?.overwrite !== true
     if (this.rawTransfer?.writeBuffer) {
-      await this.rawTransfer.writeBuffer(filePath, contents, { append, exclusive: !append })
+      await this.rawTransfer.writeBuffer(filePath, contents, { append, exclusive })
       return
     }
     if (!this.createSftp) {
@@ -210,7 +219,7 @@ export class SshFilesystemProvider implements IFilesystemProvider {
       // directly so runtime uploads do not corrupt images, PDFs, or archives.
       await uploadBuffer(sftp, contents, filePath, {
         append,
-        exclusive: !append
+        exclusive
       })
     } finally {
       sftp.end()

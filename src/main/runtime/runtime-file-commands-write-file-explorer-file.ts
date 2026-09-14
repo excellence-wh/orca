@@ -66,13 +66,17 @@ export class RuntimeFileCommandsWithWriteFileExplorerFile extends RuntimeFileCom
     const provider = requireRuntimeFileProvider(target)
     const content = Buffer.from(contentBase64, 'base64')
     if (provider) {
-      await provider.writeFileBase64(target.path, contentBase64)
+      await provider.writeFileBase64(target.path, contentBase64, { overwrite: true })
       return { ok: true }
     }
 
     const filePath = await resolveAuthorizedPath(target.path, this.host.requireStore())
     await mkdir(dirname(filePath), { recursive: true })
-    await writeFile(filePath, content, { flag: 'wx' })
+    // Why: this path serves both saves (replace the workbook) and upload staging. Staging writes
+    // land on a unique `.orca-upload-`/`.incoming-` temp name and the no-clobber guarantee is
+    // enforced at commitFileExplorerUpload, so a plain overwrite is safe and matches the text
+    // write above. `wx` here made every save of an existing file fail with EEXIST.
+    await writeFile(filePath, content)
     return { ok: true }
   }
 
@@ -95,13 +99,16 @@ export class RuntimeFileCommandsWithWriteFileExplorerFile extends RuntimeFileCom
     const provider = requireRuntimeFileProvider(target)
     const content = Buffer.from(contentBase64, 'base64')
     if (provider) {
-      await provider.writeFileBase64Chunk(target.path, contentBase64, append)
+      await provider.writeFileBase64Chunk(target.path, contentBase64, append, {
+        overwrite: !append
+      })
       return { ok: true }
     }
 
     const filePath = await resolveAuthorizedPath(target.path, this.host.requireStore())
     await mkdir(dirname(filePath), { recursive: true })
-    await writeFile(filePath, content, { flag: append ? 'a' : 'wx' })
+    // Why: same replace-on-first-chunk rule as writeFileExplorerFileBase64 above.
+    await writeFile(filePath, content, { flag: append ? 'a' : 'w' })
     return { ok: true }
   }
 
