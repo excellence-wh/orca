@@ -11,6 +11,12 @@ describe('isSafeLinkTarget', () => {
     // Leading control chars must not hide the scheme.
     expect(isSafeLinkTarget('\tjavascript:alert(1)')).toBe(false)
     expect(isSafeLinkTarget('\n\t javascript:alert(1)')).toBe(false)
+    // Nor may tab/LF/CR embedded inside the scheme: the URL parser strips those
+    // from anywhere in the input, so these resolve to `javascript:` on click.
+    expect(isSafeLinkTarget('java\tscript:alert(1)')).toBe(false)
+    expect(isSafeLinkTarget('java\nscript:alert(1)')).toBe(false)
+    expect(isSafeLinkTarget('jav\rascript:alert(1)')).toBe(false)
+    expect(isSafeLinkTarget('da\tta:text/html,<script>alert(1)</script>')).toBe(false)
   })
 
   it('allows http(s) and mailto targets', () => {

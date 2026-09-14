@@ -25,13 +25,16 @@ const ALLOWED_LINK_SCHEMES = new Set(['http', 'https', 'mailto'])
 
 /** Absolute targets must use an allow-listed scheme; relative links pass. */
 export function isSafeLinkTarget(href: string): boolean {
+  // Why: the URL parser removes every tab/LF/CR from its input, so `java\tscript:` resolves to
+  // `javascript:` on click. Judge the target the browser would resolve, not the raw attribute.
+  const normalized = href.replace(/[\t\n\r]/g, '')
   // Why: browsers strip leading C0 control chars and spaces before resolving, so
   // a `\tjavascript:` link must still be treated as absolute and rejected.
   let start = 0
-  while (start < href.length && href.charCodeAt(start) <= 0x20) {
+  while (start < normalized.length && normalized.charCodeAt(start) <= 0x20) {
     start += 1
   }
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href.slice(start))?.[1]?.toLowerCase()
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(normalized.slice(start))?.[1]?.toLowerCase()
   return !scheme || ALLOWED_LINK_SCHEMES.has(scheme)
 }
 
