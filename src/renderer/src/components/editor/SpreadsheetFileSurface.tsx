@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
 import type {
-  SpreadsheetCell,
   SpreadsheetData,
   SpreadsheetRow
 } from '../../../../shared/spreadsheet/spreadsheet-data'
@@ -10,6 +9,7 @@ import { emptySpreadsheetData } from '../../../../shared/spreadsheet/spreadsheet
 import { parseXlsxWorkbook, serializeXlsxWorkbook } from '../../../../shared/spreadsheet/excel-xlsx'
 import { detectCsvDelimiter, parseCsv } from './csv-parse'
 import { serializeCsvRows } from './csv-serialize'
+import { parseSpreadsheetCellValue, setSpreadsheetCell } from './spreadsheet-cell-edit'
 import { requestEditorFileSave } from './editor-autosave'
 import { EditableSheetGrid } from './EditableSpreadsheetGrid'
 
@@ -133,15 +133,23 @@ export default function SpreadsheetFileSurface({
       return
     }
     markDirty()
-    setLoad((prev) => {
-      if (prev.status !== 'ready') {
-        return prev
-      }
-      const next = cloneData(prev.data)
-      ensureCell(next, activeSheetIndex, rowIndex, colIndex)
-      next.worksheets[activeSheetIndex]!.rows[rowIndex]![colIndex] = parseCellValue(value)
-      return { status: 'ready', data: next, delimiter: prev.delimiter }
-    })
+    // Why: the write returns a new workbook, so this updater stays pure — React may invoke it
+    // more than once, and mutating the state it was handed would then double-apply the edit.
+    setLoad((prev) =>
+      prev.status !== 'ready'
+        ? prev
+        : {
+            status: 'ready',
+            data: setSpreadsheetCell(
+              prev.data,
+              activeSheetIndex,
+              rowIndex,
+              colIndex,
+              parseSpreadsheetCellValue(value)
+            ),
+            delimiter: prev.delimiter
+          }
+    )
   }
 
   const handleSave = async (): Promise<void> => {
@@ -215,50 +223,6 @@ export default function SpreadsheetFileSurface({
   )
 }
 
-function parseCellValue(raw: string): SpreadsheetCell {
-  if (raw === '') {
-    return null
-  }
-  if (/^-?\d+$/.test(raw)) {
-    const n = Number(raw)
-    if (Number.isSafeInteger(n)) {
-      return n
-    }
-  }
-  if (/^-?\d*\.\d+$/.test(raw)) {
-    const n = Number(raw)
-    if (Number.isFinite(n)) {
-      return n
-    }
-  }
-  return raw
-}
-
-function cloneData(data: SpreadsheetData): SpreadsheetData {
-  return {
-    worksheets: data.worksheets.map((sheet) => ({
-      name: sheet.name,
-      rows: sheet.rows.map((row) => [...row])
-    })),
-    activeSheetIndex: data.activeSheetIndex
-  }
-}
-
-function ensureCell(
-  data: SpreadsheetData,
-  sheetIndex: number,
-  rowIndex: number,
-  colIndex: number
-): void {
-  const sheet = data.worksheets[sheetIndex]!
-  while (sheet.rows.length <= rowIndex) {
-    sheet.rows.push([])
-  }
-  while (sheet.rows[rowIndex]!.length <= colIndex) {
-    sheet.rows[rowIndex]!.push(null)
-  }
-}
-
 // Why: CSV serializes on every keystroke, so produce the patched rows directly.
 // CSV fields stay raw text — numeric coercion would rewrite identifiers like
 // `00123` as `123` and drop trailing zeros on save.
@@ -268,10 +232,8 @@ function buildPatchRows(
   colIndex: number,
   value: string
 ): SpreadsheetRow[] {
-  const data = load.status === 'ready' ? cloneData(load.data) : emptySpreadsheetData()
-  ensureCell(data, 0, rowIndex, colIndex)
-  data.worksheets[0]!.rows[rowIndex]![colIndex] = value
-  return data.worksheets[0]?.rows ?? []
+  const data = load.status === 'ready' ? load.data : emptySpreadsheetData()
+  return setSpreadsheetCell(data, 0, rowIndex, colIndex, value).worksheets[0]?.rows ?? []
 }
 
 function SpreadsheetToolbar({
@@ -296,7 +258,7 @@ function SpreadsheetToolbar({
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {sheets.map((sheet, index) => (
           <button
-            key={`${index}:${sheet.name}`}
+            key={sheet.name}
             type="button"
             onClick={() => onSelectSheet(index)}
             className={`shrink-0 rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent/50 ${
